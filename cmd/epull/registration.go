@@ -39,9 +39,6 @@ func handleIdentification(token string, server string) error {
 	keyDER, _ := x509.MarshalPKCS8PrivateKey(privKey)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 
-	// save keyPEM
-	os.WriteFile(config.ClientCfgPath+hostname+".key", keyPEM, 0600)
-
 	// request to /api/v1/identity
 	payload := protocol.IdentificationRequest{Csr: string(csrPEM)}
 	body, _ := json.Marshal(payload)
@@ -78,9 +75,19 @@ func handleIdentification(token string, server string) error {
 		fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
 	}
 
+	config.Client.PrivatePEMPath = config.ClientCfgPath + hostname + ".key"
+	config.Client.CertPath = config.ClientCfgPath + hostname + ".crt"
+	config.Client.CAPath = config.ClientCfgPath + "ca.crt"
+	config.Client.Server = server
+
 	// assuming everything went well here, so we save the request
-	os.WriteFile(config.ClientCfgPath+hostname+".crt", []byte(identificationResponse.Certificate), 0644)
-	os.WriteFile(config.ClientCfgPath+"ca.crt", []byte(identificationResponse.CA), 0644)
+	os.WriteFile(config.Client.CertPath, []byte(identificationResponse.Certificate), 0644)
+	os.WriteFile(config.Client.CAPath, []byte(identificationResponse.CA), 0644)
+	os.WriteFile(config.Client.PrivatePEMPath, keyPEM, 0600)
+
+	if saveError := config.SaveClientCfg(); saveError != nil {
+		return saveError
+	}
 
 	return nil
 
