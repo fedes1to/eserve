@@ -2,7 +2,7 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"os"
 )
 
@@ -16,7 +16,7 @@ type ClientSettings struct {
 var Client ClientSettings // i cant come up with a better naming system
 
 var ClientCfgPath string = fetchPath()
-var clientSettingsPath string = clientCfgPath + "settings.json"
+var clientSettingsPath string = ClientCfgPath + "settings.json"
 
 // populates global var Client
 func LoadClient() error {
@@ -49,18 +49,16 @@ func SaveClientCfg() error {
 }
 
 func fetchPath() string {
-	path, err := os.UserConfigDir()
-	if err != nil {
-		fmt.Errorf("No user config dir found, %w", err)
-	}
+	path := "/etc/epull/" // i think its stupid to put it in user config
 
-	path += "/epull/"
 	info, err := os.Stat(path)
 	if err != nil {
 		// maybe .config doesn't exist? so we use MkdirAll
-		os.MkdirAll(path)
+		if os.MkdirAll(path, 0644) != nil {
+			log.Fatalln("Can't create config folder, is the process root?")
+		}
 	} else if !info.IsDir() {
-		fmt.Errorf("Invalid config path, please check %v", path)
+		log.Fatalln("Invalid config path, please check /etc/epull")
 	}
 
 	return path

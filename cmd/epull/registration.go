@@ -20,7 +20,7 @@ import (
 
 func handleIdentification(token string, server string) error {
 	// making the certs and CSR
-	_, privKey, keyError := ed25519.GenerateKey()
+	_, privKey, keyError := ed25519.GenerateKey(nil)
 	if keyError != nil {
 		return keyError
 	}
@@ -43,7 +43,7 @@ func handleIdentification(token string, server string) error {
 	os.WriteFile(config.ClientCfgPath+hostname+".key", keyPEM, 0600)
 
 	// request to /api/v1/identity
-	payload := protocols.IdentificationRequest{Csr: string(csrPEM)}
+	payload := protocol.IdentificationRequest{Csr: string(csrPEM)}
 	body, _ := json.Marshal(payload)
 
 	request, _ := http.NewRequest("POST", server+"/api/v1/identity", bytes.NewReader(body))
@@ -57,7 +57,7 @@ func handleIdentification(token string, server string) error {
 	defer response.Body.Close()
 
 	// decode json to struct
-	var identificationResponse protocols.IdentificationResponse
+	var identificationResponse protocol.IdentificationResponse
 	jsonError := json.NewDecoder(response.Body).Decode(&identificationResponse)
 	if jsonError != nil {
 		return jsonError

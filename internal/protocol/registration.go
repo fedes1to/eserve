@@ -1,4 +1,4 @@
-package protocols
+package protocol
 
 type IdentificationRequest struct {
 	Csr string `json:"csr"`
