@@ -9,11 +9,13 @@ import (
 type ClientSettings struct {
 	PrivatePEMPath string `json:"pem_path"`
 	Server         string `json:"server"`
+	CertPath       string `json:"cert_path"`
+	CAPath         string `json:"ca_path"`
 }
 
 var Client ClientSettings // i cant come up with a better naming system
 
-var clientCfgPath string = fetchPath()
+var ClientCfgPath string = fetchPath()
 var clientSettingsPath string = clientCfgPath + "settings.json"
 
 // populates global var Client

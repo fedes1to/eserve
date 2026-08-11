@@ -12,15 +12,17 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"git.fedesito.me/fedesito/eserve/internal/config"
 	"git.fedesito.me/fedesito/eserve/internal/protocol"
 )
 
-func handleIdentification(token string, server string) {
+func handleIdentification(token string, server string) error {
 	// making the certs and CSR
 	_, privKey, keyError := ed25519.GenerateKey()
 	if keyError != nil {
-		fmt.Errorf("Couldn't generate ed25519 key, %w", keyError)
+		return keyError
 	}
 
 	hostname, _ := os.Hostname()
@@ -31,11 +33,14 @@ func handleIdentification(token string, server string) {
 	csrDER, csrError := x509.CreateCertificateRequest(rand.Reader, csrTemplate, privKey)
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
 	if csrError != nil {
-		fmt.Errorf("Couldn't create certificate request, %w", csrError)
+		return csrError
 	}
 
 	keyDER, _ := x509.MarshalPKCS8PrivateKey(privKey)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
+
+	// save keyPEM
+	os.WriteFile(config.ClientCfgPath+hostname+".key", keyPEM, 0600)
 
 	// request to /api/v1/identity
 	payload := protocols.IdentificationRequest{Csr: string(csrPEM)}
@@ -47,8 +52,37 @@ func handleIdentification(token string, server string) {
 
 	response, responseError := http.DefaultClient.Do(request)
 	if responseError != nil {
-		fmt.Errorf("Identity request failed, %w", responseError)
+		return responseError
 	}
+	defer response.Body.Close()
+
+	// decode json to struct
+	var identificationResponse protocols.IdentificationResponse
+	jsonError := json.NewDecoder(response.Body).Decode(&identificationResponse)
+	if jsonError != nil {
+		return jsonError
+	}
+
+	// checks to be nice n shit
+	if identificationResponse.CN != hostname {
+		fmt.Errorf(
+			"Hostname mismatch! continuing..., expected %v, received %v",
+			hostname,
+			identificationResponse.CN)
+	}
+
+	validUntil, _ := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
+	daysLeft := validUntil.Sub(time.Now()).Hours() / 24
+
+	if daysLeft < 30 {
+		fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
+	}
+
+	// assuming everything went well here, so we save the request
+	os.WriteFile(config.ClientCfgPath+hostname+".crt", []byte(identificationResponse.Certificate), 0644)
+	os.WriteFile(config.ClientCfgPath+"ca.crt", []byte(identificationResponse.CA), 0644)
+
+	return nil
 
 }
 
