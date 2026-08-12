@@ -19,12 +19,12 @@ var clientSettingsPath string = ClientConfigPath + "settings.json"
 
 // populates global var Client
 func LoadClientSettings() error {
-	return LoadJsonFile(clientSettingsPath, &Client)
+	return loadJsonFile(clientSettingsPath, &Client)
 }
 
 // path will never fuckin change ok?
 func SaveClientSettings() error {
-	return SafeSaveJsonFile(clientSettingsPath, Client)
+	return safeSaveJsonFile(clientSettingsPath, Client)
 }
 
 func fetchClientPath() string {
@@ -32,12 +32,12 @@ func fetchClientPath() string {
 
 	info, err := os.Stat(path)
 	if err != nil {
-		// maybe .config doesn't exist? so we use MkdirAll
+		// maybe /etc/ doesn't exist (x doubt)? so we use MkdirAll
 		if os.MkdirAll(path, 0644) != nil {
 			log.Fatalln("Can't create config folder, is the process root?")
 		}
 	} else if !info.IsDir() {
-		log.Fatalln("Invalid config path, please check /etc/epull")
+		log.Fatalln("Invalid config path, please check", path)
 	}
 
 	return path

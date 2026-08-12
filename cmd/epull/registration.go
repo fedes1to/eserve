@@ -53,6 +53,10 @@ func handleIdentification(token string, server string) error {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		return fmt.Errorf("Invalid response, got code %v", response.StatusCode)
+	}
+
 	// decode json to struct
 	var identificationResponse protocol.IdentificationResponse
 	jsonError := json.NewDecoder(response.Body).Decode(&identificationResponse)
@@ -62,17 +66,17 @@ func handleIdentification(token string, server string) error {
 
 	// checks to be nice n shit
 	if identificationResponse.CN != hostname {
-		fmt.Errorf(
+		_ = fmt.Errorf(
 			"Hostname mismatch! continuing..., expected %v, received %v",
 			hostname,
 			identificationResponse.CN)
 	}
 
 	validUntil, _ := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
-	daysLeft := validUntil.Sub(time.Now()).Hours() / 24
+	daysLeft := time.Until(validUntil).Hours() / 24
 
 	if daysLeft < 30 {
-		fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
+		_ = fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
 	}
 
 	config.Client.PrivatePEMPath = config.ClientConfigPath + hostname + ".key"
@@ -93,23 +97,29 @@ func handleIdentification(token string, server string) error {
 
 }
 
-func handleProvisioning(flavor string) {
+func handleProvisioning(flavor string) error {
 	// Provisioning
 	cpuSubarch, subarchError := getCpuSubarch()
 
 	if subarchError != nil {
-		fmt.Errorf("Failed to find subarch, %w", subarchError)
+		return subarchError
 	}
 
 	log.Println("Found subarch:", cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
+	//payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
+	return nil
 }
 
-func handleRegistration(token string, server string, flavor string) {
-	log.Printf("Registering on server: %v with profile %v", server, flavor)
+func handleRegistration(token string, server string, flavor string) (error, int) {
+	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	handleIdentification(token, server)
-	handleProvisioning(flavor)
+	if identifyError := handleIdentification(token, server); identifyError != nil {
+		return identifyError, 1
+	}
+	if provisioningError := handleProvisioning(flavor); provisioningError != nil {
+		return provisioningError, 1
+	}
+	return nil, 0
 }

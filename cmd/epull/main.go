@@ -3,15 +3,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
 	"git.fedesito.me/fedesito/eserve/internal/config"
 )
 
-func parseArgs() {
+func parseArgs() (error, int) {
 	// registration
-	register := flag.Bool("register", false, "Sets up a profile (chroot) on target server")
+	register := flag.Bool("register", false, "Sets up a flavor (chroot) on target server")
 	token := flag.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
 	server := flag.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
 	flavor := flag.String("flavor", "", "Flavor name used on registration, will default to hostname")
@@ -19,20 +18,26 @@ func parseArgs() {
 	flag.Parse()
 
 	if *register && (*token == "" || *server == "") {
-		log.Fatalln("Register requires a token and server")
+		return fmt.Errorf("Register requires a token and server"), 2
 	} else if *register {
 		if *flavor == "" {
 			*flavor, _ = os.Hostname()
 		}
-		handleRegistration(*token, *server, *flavor)
+		return handleRegistration(*token, *server, *flavor)
 	} else {
 		if configError := config.LoadClientSettings(); configError != nil {
-			fmt.Errorf("Couldn't load config, %w", configError)
+			return configError, 1
 		}
 	}
+
+	return nil, 0
 
 }
 
 func main() {
-	parseArgs()
+	err, exitCode := parseArgs()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Something went wrong:", err)
+	}
+	os.Exit(exitCode)
 }
