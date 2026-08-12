@@ -15,13 +15,13 @@ func safeSaveJsonFile(path string, from any) error {
 	backupJson, backupError := os.Create(backupPath)
 
 	if openError != nil && !errors.Is(openError, fs.ErrNotExist) {
-		_ = fmt.Errorf("Couldn't open old JSON for backup, %w", openError)
+		fmt.Fprintln(os.Stderr, "Couldn't open old JSON for backup,", openError)
 	} else if backupError != nil {
-		_ = fmt.Errorf("Couldn't access target backup JSON, %w", backupError)
+		fmt.Fprintln(os.Stderr, "Couldn't access target backup JSON,", backupError)
 	} else if openError == nil {
 		_, copyError := io.Copy(oldJson, backupJson)
 		if copyError != nil {
-			_ = fmt.Errorf("Couldn't copy backup JSON, %w", copyError)
+			fmt.Fprintln(os.Stderr, "Couldn't copy backup JSON,", copyError)
 		}
 		defer oldJson.Close()
 		defer backupJson.Close()

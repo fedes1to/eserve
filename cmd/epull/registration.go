@@ -66,8 +66,8 @@ func handleIdentification(token string, server string) error {
 
 	// checks to be nice n shit
 	if identificationResponse.CN != hostname {
-		_ = fmt.Errorf(
-			"Hostname mismatch! continuing..., expected %v, received %v",
+		fmt.Fprintf(os.Stderr,
+			"Hostname mismatch! continuing..., expected %v, received %v\n",
 			hostname,
 			identificationResponse.CN)
 	}
@@ -76,7 +76,7 @@ func handleIdentification(token string, server string) error {
 	daysLeft := time.Until(validUntil).Hours() / 24
 
 	if daysLeft < 30 {
-		_ = fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
+		log.Printf("Careful! Certificates expire in %v days", daysLeft)
 	}
 
 	config.Client.PrivatePEMPath = config.ClientConfigPath + hostname + ".key"

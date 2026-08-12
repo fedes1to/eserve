@@ -37,7 +37,7 @@ func parseArgs() (error, int) {
 func main() {
 	err, exitCode := parseArgs()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Something went wrong:", err)
+		fmt.Fprintln(os.Stderr, "Something went wrong,", err)
 	}
 	os.Exit(exitCode)
 }
