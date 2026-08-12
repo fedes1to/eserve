@@ -1,18 +1,18 @@
 package main
 
 import (
-	"crypto/ed25519"
-	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
-	"git.fedesito.me/fedesito/eserve/internal/protocol"
 	"net/http"
-	"time"
+	"strings"
+
+	"git.fedesito.me/fedesito/eserve/internal/protocol"
 )
 
 func postIdentity(w http.ResponseWriter, r *http.Request) {
+	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+
 	var identificationRequest protocol.IdentificationRequest
 	decodeError := json.NewDecoder(r.Body).Decode(&identificationRequest)
 	if decodeError != nil {
@@ -28,7 +28,5 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 	if csrError != nil {
 		http.Error(w, "cant parse csr", http.StatusBadRequest)
 	}
-
-	
 
 }
