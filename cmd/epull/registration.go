@@ -75,9 +75,9 @@ func handleIdentification(token string, server string) error {
 		fmt.Errorf("Careful! Certificates expire in %v days", daysLeft)
 	}
 
-	config.Client.PrivatePEMPath = config.ClientCfgPath + hostname + ".key"
-	config.Client.CertPath = config.ClientCfgPath + hostname + ".crt"
-	config.Client.CAPath = config.ClientCfgPath + "ca.crt"
+	config.Client.PrivatePEMPath = config.ClientConfigPath + hostname + ".key"
+	config.Client.CertPath = config.ClientConfigPath + hostname + ".crt"
+	config.Client.CAPath = config.ClientConfigPath + "ca.crt"
 	config.Client.Server = server
 
 	// assuming everything went well here, so we save the request
@@ -85,7 +85,7 @@ func handleIdentification(token string, server string) error {
 	os.WriteFile(config.Client.CAPath, []byte(identificationResponse.CA), 0644)
 	os.WriteFile(config.Client.PrivatePEMPath, keyPEM, 0600)
 
-	if saveError := config.SaveClientCfg(); saveError != nil {
+	if saveError := config.SaveClientSettings(); saveError != nil {
 		return saveError
 	}
 
@@ -104,7 +104,7 @@ func handleProvisioning(flavor string) {
 	log.Println("Found subarch:", cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := interfaces.Provision{SubArch: cpuSubarch, Flavor: flavor}
+	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
 }
 
 func handleRegistration(token string, server string, flavor string) {

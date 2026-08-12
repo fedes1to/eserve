@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"git.fedesito.me/fedesito/eserve/internal/config"
 	"log"
 	"os"
+
+	"git.fedesito.me/fedesito/eserve/internal/config"
 )
 
 func parseArgs() {
@@ -25,7 +26,7 @@ func parseArgs() {
 		}
 		handleRegistration(*token, *server, *flavor)
 	} else {
-		if configError := config.LoadClient(); configError != nil {
+		if configError := config.LoadClientSettings(); configError != nil {
 			fmt.Errorf("Couldn't load config, %w", configError)
 		}
 	}
