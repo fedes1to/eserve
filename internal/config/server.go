@@ -6,3 +6,9 @@ type ServerSettings struct {
 	PerUserThreads string `json:"per_user_threads"`
 	ChrootBase     string `json:"chroot_base"`
 }
+
+func fetchServerPath() string {
+	path := "/etc/eserved/"
+	initSettingsPath(path)
+	return path
+}
