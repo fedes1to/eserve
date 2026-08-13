@@ -7,6 +7,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -17,8 +18,9 @@ var (
 	CaCertificate     *x509.Certificate
 	CaKey             any
 	CaCertificatePEM  []byte
-	caCertificatePath string = path + "ca.crt"
-	caKeyPath         string = path + "ca.key"
+	caCertificatePath string = ServerConfigPath + "ca.crt"
+	caKeyPath         string = ServerConfigPath + "ca.key"
+	CaPool            *x509.CertPool
 )
 
 func RandomSerial() *big.Int {
@@ -28,7 +30,7 @@ func RandomSerial() *big.Int {
 	return new(big.Int).SetBytes(b)
 }
 
-func InitializeCaCertificate() error {
+func LoadCaCertificate() error {
 	if _, certError := os.Stat(caCertificatePath); errors.Is(certError, os.ErrNotExist) {
 		if err := generateCa(); err != nil {
 			return certError
@@ -59,6 +61,11 @@ func InitializeCaCertificate() error {
 	CaKey, caKeyError = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 	if caKeyError != nil {
 		return caKeyError
+	}
+
+	CaPool = x509.NewCertPool()
+	if !CaPool.AppendCertsFromPEM(CaCertificatePEM) {
+		return fmt.Errorf("no CA certificates parsed from ca.crt")
 	}
 
 	return nil

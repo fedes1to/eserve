@@ -85,3 +85,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+func postProvision(w http.ResponseWriter, r *http.Request) {
+	// gotta make this method i guess
+}

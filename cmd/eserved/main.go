@@ -11,18 +11,27 @@ import (
 )
 
 func parseArgs() {
-	address := flag.String("ip", "127.0.0.1:8080", "Listen address")
+	admin := flag.Bool("admin", true, "let eservectl work, defaults to true")
 	flag.Parse()
 
-	serveHTTP(*address)
+	serveHTTP(*admin)
 }
 
 func main() {
 	log.Println("Starting eserved...")
 
+	if initError := serverConfig.InitializeServerSettings(); initError != nil {
+		fmt.Fprintln(os.Stderr, "Failed to generate settings.json,", initError)
+		os.Exit(1)
+	}
+
 	// populate necessary global vars
-	if certError := serverConfig.InitializeCaCertificate(); certError != nil {
+	if certError := serverConfig.LoadCaCertificate(); certError != nil {
 		fmt.Fprintln(os.Stderr, "Failed to init ca certificate,", certError)
+		os.Exit(1)
+	}
+	if tlsError := serverConfig.LoadTlsCertificates(); tlsError != nil {
+		fmt.Fprintln(os.Stderr, "Failed to init tls certificate,", tlsError)
 		os.Exit(1)
 	}
 	if tokenError := config.LoadTokens(); tokenError != nil {

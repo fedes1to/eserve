@@ -50,7 +50,7 @@ func loadTokensLocked() error {
 	return nil
 }
 
-func CreateToken() error {
+func CreateToken() (string, error) {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
@@ -62,13 +62,13 @@ func CreateToken() error {
 	defer tokensMutex.Unlock()
 
 	if _, tokenExists := tokens.Entries[token]; tokenExists {
-		return fmt.Errorf("Token already exists... You just stumbled on something almost impossible, or something is really fucked with your PC, Bye!")
+		return "", fmt.Errorf("Token already exists... You just stumbled on something almost impossible, or something is really fucked with your PC, Bye!")
 	}
 	entry := tokens.Entries[token]
 	entry.CreatedAt = time.Now()
 	tokens.Entries[token] = entry
 
-	return saveTokensLocked()
+	return token, saveTokensLocked()
 }
 
 func IsTokenAvailable(token string) bool {
