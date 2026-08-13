@@ -14,8 +14,8 @@ import (
 	"os"
 	"time"
 
-	"git.fedesito.me/fedesito/eserve/internal/config"
-	"git.fedesito.me/fedesito/eserve/internal/protocol"
+	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 func handleIdentification(token string, server string) error {
@@ -79,17 +79,17 @@ func handleIdentification(token string, server string) error {
 		log.Printf("Careful! Certificates expire in %v days", daysLeft)
 	}
 
-	config.Client.PrivatePEMPath = config.ClientConfigPath + hostname + ".key"
-	config.Client.CertPath = config.ClientConfigPath + hostname + ".crt"
-	config.Client.CAPath = config.ClientConfigPath + "ca.crt"
-	config.Client.Server = server
+	clientConfig.Client.PrivatePEMPath = clientConfig.ClientConfigPath + hostname + ".key"
+	clientConfig.Client.CertPath = clientConfig.ClientConfigPath + hostname + ".crt"
+	clientConfig.Client.CAPath = clientConfig.ClientConfigPath + "ca.crt"
+	clientConfig.Client.Server = server
 
 	// assuming everything went well here, so we save the request
-	os.WriteFile(config.Client.CertPath, []byte(identificationResponse.Certificate), 0644)
-	os.WriteFile(config.Client.CAPath, []byte(identificationResponse.CA), 0644)
-	os.WriteFile(config.Client.PrivatePEMPath, keyPEM, 0600)
+	os.WriteFile(clientConfig.Client.CertPath, []byte(identificationResponse.Certificate), 0644)
+	os.WriteFile(clientConfig.Client.CAPath, []byte(identificationResponse.CA), 0644)
+	os.WriteFile(clientConfig.Client.PrivatePEMPath, keyPEM, 0600)
 
-	if saveError := config.SaveClientSettings(); saveError != nil {
+	if saveError := clientConfig.SaveClientSettings(); saveError != nil {
 		return saveError
 	}
 

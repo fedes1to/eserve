@@ -1,5 +1,9 @@
 package config
 
+import (
+	"git.fedesito.me/fedes1to/eserve/internal/config"
+)
+
 type ServerSettings struct {
 	ListenAddr     string `json:"listen_addr"`
 	BuildThreads   string `json:"build_threads"`
@@ -9,6 +13,6 @@ type ServerSettings struct {
 
 func fetchServerPath() string {
 	path := "/etc/eserved/"
-	initSettingsPath(path)
+	config.InitSettingsPath(path)
 	return path
 }

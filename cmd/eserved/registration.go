@@ -7,14 +7,14 @@ import (
 	"net/http"
 	"strings"
 
-	"git.fedesito.me/fedesito/eserve/internal/config"
-	"git.fedesito.me/fedesito/eserve/internal/protocol"
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 // TODO: fail after ban / rate limit
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !config.IsTokenAvailable(token) {
+	if !serverConfig.IsTokenAvailable(token) {
 		http.Error(w, "bad token", http.StatusBadRequest)
 		return
 	}

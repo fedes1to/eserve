@@ -1,4 +1,8 @@
-package config
+package clientConfig
+
+import (
+	"git.fedesito.me/fedes1to/eserve/internal/config"
+)
 
 type ClientSettings struct {
 	PrivatePEMPath string `json:"pem_path"`
@@ -14,16 +18,16 @@ var clientSettingsPath string = ClientConfigPath + "settings.json"
 
 // populates global var Client
 func LoadClientSettings() error {
-	return loadJsonFile(clientSettingsPath, &Client)
+	return config.LoadJsonFile(clientSettingsPath, &Client)
 }
 
 // path will never fuckin change ok?
 func SaveClientSettings() error {
-	return safeSaveJsonFile(clientSettingsPath, Client)
+	return config.SafeSaveJsonFile(clientSettingsPath, Client)
 }
 
 func fetchClientPath() string {
 	path := "/etc/epull/"
-	initSettingsPath(path)
+	config.InitSettingsPath(path)
 	return path
 }

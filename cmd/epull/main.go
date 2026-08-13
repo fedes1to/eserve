@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"git.fedesito.me/fedesito/eserve/internal/config"
+	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
 )
 
 func parseArgs() (error, int) {
@@ -25,7 +25,7 @@ func parseArgs() (error, int) {
 		}
 		return handleRegistration(*token, *server, *flavor)
 	} else {
-		if configError := config.LoadClientSettings(); configError != nil {
+		if configError := clientConfig.LoadClientSettings(); configError != nil {
 			return configError, 1
 		}
 	}

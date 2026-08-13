@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func initSettingsPath(path string) {
+func InitSettingsPath(path string) {
 	info, err := os.Stat(path)
 	if err != nil {
 		// maybe /etc/ doesn't exist (x doubt)? so we use MkdirAll

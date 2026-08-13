@@ -9,7 +9,7 @@ import (
 	"os"
 )
 
-func safeSaveJsonFile(path string, from any) error {
+func SafeSaveJsonFile(path string, from any) error {
 	backupPath := path + ".bak"
 	oldJson, openError := os.Open(path)
 	backupJson, backupError := os.Create(backupPath)
@@ -42,7 +42,7 @@ func safeSaveJsonFile(path string, from any) error {
 	return nil
 }
 
-func loadJsonFile[T any](path string, into *T) error {
+func LoadJsonFile[T any](path string, into *T) error {
 	jsonFile, openError := os.Open(path)
 	if openError != nil {
 		return openError
