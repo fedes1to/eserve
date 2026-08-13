@@ -20,7 +20,7 @@ import (
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !config.IsTokenAvailable(token) {
-		log.Printf("%v Attempted login with invalid token %v\n", r.RemoteAddr, token)
+		log.Printf("%v Attempted login with invalid token %v\n", clientIP(r), token)
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
