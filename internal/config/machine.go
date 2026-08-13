@@ -1,4 +1,4 @@
-package serverConfig
+package config
 
 import (
 	"fmt"
@@ -42,5 +42,10 @@ func CreateMachine(token string, march string, flavor string, threads ...int) er
 	entry.Flavor = flavor
 	entry.Threads = actualThreads
 	machines.Entries[token] = entry
+	return nil
+}
+
+func RefreshMachines() error {
+
 	return nil
 }

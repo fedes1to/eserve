@@ -11,13 +11,14 @@ import (
 	"time"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 // TODO: fail after ban / rate limit
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !serverConfig.IsTokenAvailable(token) {
+	if !config.IsTokenAvailable(token) {
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
@@ -41,7 +42,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !serverConfig.ValidCN(token, csr.Subject.CommonName) {
+	if !config.ValidCN(token, csr.Subject.CommonName) {
 		http.Error(w, "invalid cn or mismatch", http.StatusBadRequest)
 		return
 	}
@@ -71,7 +72,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if tokenError := serverConfig.UseToken(token, csr.Subject.CommonName); tokenError != nil {
+	if tokenError := config.UseToken(token, csr.Subject.CommonName); tokenError != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}

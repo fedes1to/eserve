@@ -1,4 +1,4 @@
-package serverConfig
+package config
 
 import (
 	"crypto/rand"
@@ -90,4 +90,8 @@ func UseToken(token string, cn string) error {
 
 	return nil
 
+}
+
+func RefreshTokens() error {
+	return nil
 }

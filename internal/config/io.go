@@ -19,7 +19,7 @@ func SafeSaveJsonFile(path string, from any) error {
 	} else if backupError != nil {
 		fmt.Fprintln(os.Stderr, "Couldn't access target backup JSON,", backupError)
 	} else if openError == nil {
-		_, copyError := io.Copy(oldJson, backupJson)
+		_, copyError := io.Copy(backupJson, oldJson)
 		if copyError != nil {
 			fmt.Fprintln(os.Stderr, "Couldn't copy backup JSON,", copyError)
 		}
