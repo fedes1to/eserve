@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -54,7 +55,13 @@ func handleIdentification(token string, server string) error {
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		return fmt.Errorf("Invalid response, got code %v", response.StatusCode)
+		bodyBytes, ioError := io.ReadAll(response.Body)
+		if ioError != nil {
+			return fmt.Errorf("Invalid response, got code %v without body due to: %w",
+				response.StatusCode, ioError)
+		}
+		return fmt.Errorf("Invalid response, got code %v with body:\n%v",
+			response.StatusCode, string(bodyBytes))
 	}
 
 	// decode json to struct
@@ -79,15 +86,15 @@ func handleIdentification(token string, server string) error {
 		log.Printf("Careful! Certificates expire in %v days\n", daysLeft)
 	}
 
-	clientConfig.Client.PrivatePEMPath = clientConfig.ClientConfigPath + hostname + ".key"
-	clientConfig.Client.CertPath = clientConfig.ClientConfigPath + hostname + ".crt"
-	clientConfig.Client.CAPath = clientConfig.ClientConfigPath + "ca.crt"
-	clientConfig.Client.Server = server
+	clientConfig.Settings.PrivatePEMPath = clientConfig.ClientConfigPath + hostname + ".key"
+	clientConfig.Settings.CertPath = clientConfig.ClientConfigPath + hostname + ".crt"
+	clientConfig.Settings.CAPath = clientConfig.ClientConfigPath + "ca.crt"
+	clientConfig.Settings.Server = server
 
 	// assuming everything went well here, so we save the request
-	os.WriteFile(clientConfig.Client.CertPath, []byte(identificationResponse.Certificate), 0644)
-	os.WriteFile(clientConfig.Client.CAPath, []byte(identificationResponse.CA), 0644)
-	os.WriteFile(clientConfig.Client.PrivatePEMPath, keyPEM, 0600)
+	os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644)
+	os.WriteFile(clientConfig.Settings.CAPath, []byte(identificationResponse.CA), 0644)
+	os.WriteFile(clientConfig.Settings.PrivatePEMPath, keyPEM, 0600)
 
 	if saveError := clientConfig.SaveClientSettings(); saveError != nil {
 		return saveError

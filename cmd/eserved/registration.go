@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !config.IsTokenAvailable(token) {
+		log.Printf("%v Attempted login with invalid token %v\n", r.RemoteAddr, token)
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}

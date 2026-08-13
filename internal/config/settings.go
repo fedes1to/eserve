@@ -5,7 +5,13 @@ import (
 	"os"
 )
 
-func InitSettingsPath(path string) {
+// hardcoding go brrr i guess
+var (
+	ServerConfigPath = "/etc/eserved/"
+	ClientConfigPath = "/etc/epull/"
+)
+
+func InitConfigPath(path string) string {
 	info, err := os.Stat(path)
 	if err != nil {
 		// maybe /etc/ doesn't exist (x doubt)? so we use MkdirAll
@@ -15,4 +21,5 @@ func InitSettingsPath(path string) {
 	} else if !info.IsDir() {
 		log.Fatalln("Invalid config path, please check", path)
 	}
+	return path // can be safely ignored, its just for convenience
 }

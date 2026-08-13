@@ -4,7 +4,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
-var path = fetchServerPath()
+var path = config.InitConfigPath(config.ServerConfigPath)
 
 type ServerSettings struct {
 	ListenAddr     string `json:"listen_addr"`
@@ -13,8 +13,17 @@ type ServerSettings struct {
 	ChrootBase     string `json:"chroot_base"`
 }
 
-func fetchServerPath() string {
-	path := "/etc/eserved/"
-	config.InitSettingsPath(path)
-	return path
+var Settings ServerSettings // i cant come up with a better naming system
+
+var ServerConfigPath string = config.InitConfigPath(config.ServerConfigPath)
+var serverSettingsPath string = ServerConfigPath + "settings.json"
+
+// populates global var Server
+func LoadServerSettings() error {
+	return config.LoadJsonFile(serverSettingsPath, &Settings)
+}
+
+// path will never fuckin change ok?
+func SaveServerSettings() error {
+	return config.SafeSaveJsonFile(serverSettingsPath, Settings)
 }

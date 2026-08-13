@@ -21,10 +21,39 @@ type TokensFile struct {
 
 var (
 	tokens      TokensFile
-	tokensMutex sync.Mutex
+	tokensMutex sync.RWMutex
+	tokensPath  string
 )
 
+func LoadTokens() error {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+	if loadError := loadTokensLocked(); loadError != nil {
+		return loadError
+	}
+	return nil
+}
+
+// READ THE FUCKING NAME, USE ONLY WHEN LOCKED
+func saveTokensLocked() error {
+	if saveError := SafeSaveJsonFile(tokensPath, tokens); saveError != nil {
+		return saveError
+	}
+	return nil
+}
+
+// READ THE FUCKING NAME, USE ONLY WHEN LOCKED
+func loadTokensLocked() error {
+	if loadError := LoadJsonFile(tokensPath, &tokens); loadError != nil {
+		return loadError
+	}
+	return nil
+}
+
 func CreateToken() error {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+
 	tokenBytes := make([]byte, 32)
 	rand.Read(tokenBytes)
 	token := fmt.Sprintf("%x", tokenBytes)
@@ -39,26 +68,35 @@ func CreateToken() error {
 	entry.CreatedAt = time.Now()
 	tokens.Entries[token] = entry
 
-	return nil
+	return saveTokensLocked()
 }
 
 func IsTokenAvailable(token string) bool {
-	tokensMutex.Lock()
-	defer tokensMutex.Unlock()
+	tokensMutex.RLock()
+	defer tokensMutex.RUnlock()
 
+	return isTokenAvailableLocked(token)
+}
+
+// READ THE FUCKING NAME, USE ONLY WHEN LOCKED
+func isTokenAvailableLocked(token string) bool {
 	tokenToCheck, tokenExists := tokens.Entries[token]
+	if !tokenExists {
+		return false
+	}
+
 	if tokenToCheck.CN != "" || !tokenToCheck.UsedAt.UTC().IsZero() {
 		if _, machineExists := machines.Entries[token]; machineExists {
 			return false
 		}
 		log.Println("Token is used but not in machines, continuing...")
 	}
-	return tokenExists
+	return true
 }
 
 func ValidCN(token string, cn string) bool {
-	tokensMutex.Lock()
-	defer tokensMutex.Unlock()
+	tokensMutex.RLock()
+	defer tokensMutex.RUnlock()
 
 	entry, exists := tokens.Entries[token]
 	if !exists || cn == "" || cn != entry.CN {
@@ -72,26 +110,14 @@ func UseToken(token string, cn string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
-	tokenToUse, tokenExists := tokens.Entries[token]
-	if !tokenExists {
-		return fmt.Errorf("Token doesn't exist")
+	if !isTokenAvailableLocked(token) {
+		return fmt.Errorf("Token became invalid at usage")
 	}
 
-	if tokenToUse.CN != "" || !tokenToUse.UsedAt.UTC().IsZero() {
-		if _, machineOk := machines.Entries[token]; machineOk {
-			return fmt.Errorf("Tried to use a used token")
-		}
-		log.Println("Token is used but not in machines, continuing...")
-	}
-
+	tokenToUse := tokens.Entries[token]
 	tokenToUse.CN = cn
 	tokenToUse.UsedAt = time.Now()
 	tokens.Entries[token] = tokenToUse
 
-	return nil
-
-}
-
-func RefreshTokens() error {
-	return nil
+	return saveTokensLocked()
 }

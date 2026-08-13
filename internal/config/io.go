@@ -45,6 +45,9 @@ func SafeSaveJsonFile(path string, from any) error {
 func LoadJsonFile[T any](path string, into *T) error {
 	jsonFile, openError := os.Open(path)
 	if openError != nil {
+		if errors.Is(openError, os.ErrNotExist) {
+			return nil // its just an empty file
+		}
 		return openError
 	}
 	defer jsonFile.Close()

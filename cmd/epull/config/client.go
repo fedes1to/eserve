@@ -11,23 +11,17 @@ type ClientSettings struct {
 	CAPath         string `json:"ca_path"`
 }
 
-var Client ClientSettings // i cant come up with a better naming system
+var Settings ClientSettings // i cant come up with a better naming system
 
-var ClientConfigPath string = fetchClientPath()
+var ClientConfigPath string = config.InitConfigPath(config.ClientConfigPath)
 var clientSettingsPath string = ClientConfigPath + "settings.json"
 
 // populates global var Client
 func LoadClientSettings() error {
-	return config.LoadJsonFile(clientSettingsPath, &Client)
+	return config.LoadJsonFile(clientSettingsPath, &Settings)
 }
 
 // path will never fuckin change ok?
 func SaveClientSettings() error {
-	return config.SafeSaveJsonFile(clientSettingsPath, Client)
-}
-
-func fetchClientPath() string {
-	path := "/etc/epull/"
-	config.InitSettingsPath(path)
-	return path
+	return config.SafeSaveJsonFile(clientSettingsPath, Settings)
 }
