@@ -22,7 +22,7 @@ type TokensFile struct {
 var (
 	tokens      TokensFile
 	tokensMutex sync.RWMutex
-	tokensPath  string
+	tokensPath  string = ServerConfigPath + "tokens.json"
 )
 
 func LoadTokens() error {
@@ -47,6 +47,11 @@ func loadTokensLocked() error {
 	if loadError := LoadJsonFile(tokensPath, &tokens); loadError != nil {
 		return loadError
 	}
+
+	if tokens.Entries == nil {
+		tokens.Entries = make(map[string]TokenEntry)
+	}
+
 	return nil
 }
 
@@ -57,9 +62,6 @@ func CreateToken() (string, error) {
 	tokenBytes := make([]byte, 32)
 	rand.Read(tokenBytes)
 	token := fmt.Sprintf("%x", tokenBytes)
-
-	tokensMutex.Lock()
-	defer tokensMutex.Unlock()
 
 	if _, tokenExists := tokens.Entries[token]; tokenExists {
 		return "", fmt.Errorf("Token already exists... You just stumbled on something almost impossible, or something is really fucked with your PC, Bye!")
@@ -99,10 +101,14 @@ func ValidCN(token string, cn string) bool {
 	defer tokensMutex.RUnlock()
 
 	entry, exists := tokens.Entries[token]
-	if !exists || cn == "" || cn != entry.CN {
+	if !exists || cn == "" {
 		return false
 	}
 
+	// for new cns
+	if entry.CN != "" && cn != entry.CN {
+		return false
+	}
 	return true
 }
 

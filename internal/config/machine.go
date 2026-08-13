@@ -45,6 +45,11 @@ func loadMachinesLocked() error {
 	if loadError := LoadJsonFile(machinesPath, &machines); loadError != nil {
 		return loadError
 	}
+
+	if machines.Entries == nil {
+		machines.Entries = make(map[string]MachineEntry)
+	}
+
 	return nil
 }
 

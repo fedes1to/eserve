@@ -11,7 +11,7 @@ import (
 )
 
 func parseArgs() {
-	admin := flag.Bool("admin", true, "let eservectl work, defaults to true")
+	admin := flag.Bool("admin", true, "allow eservectl endpoint, defaults to true")
 	flag.Parse()
 
 	serveHTTP(*admin)

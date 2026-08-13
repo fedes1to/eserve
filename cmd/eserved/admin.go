@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
@@ -12,7 +13,8 @@ func postCreateToken(w http.ResponseWriter, r *http.Request) {
 	token, tokenError := config.CreateToken()
 
 	if tokenError != nil {
-		http.Error(w, "failed to create token", http.StatusInternalServerError)
+		fmt.Fprintln(os.Stderr, "failed to create token,", tokenError)
+		http.Error(w, "failed to create token, check logs", http.StatusInternalServerError)
 		return
 	}
 

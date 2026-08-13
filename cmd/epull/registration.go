@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/json"
@@ -19,9 +20,9 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
-func handleIdentification(token string, server string) error {
+func handleIdentification(token string, server string, insecure bool) error {
 	// making the certs and CSR
-	_, privKey, keyError := ed25519.GenerateKey(nil)
+	_, privKey, keyError := ed25519.GenerateKey(rand.Reader)
 	if keyError != nil {
 		return keyError
 	}
@@ -41,6 +42,19 @@ func handleIdentification(token string, server string) error {
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 
 	// request to /api/v1/identity
+	var client *http.Client
+	if insecure {
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+					MinVersion:         tls.VersionTLS13,
+				},
+			},
+		}
+	} else {
+		client = http.DefaultClient
+	}
 	payload := protocol.IdentificationRequest{Csr: string(csrPEM)}
 	body, _ := json.Marshal(payload)
 
@@ -48,7 +62,7 @@ func handleIdentification(token string, server string) error {
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", "application/json")
 
-	response, responseError := http.DefaultClient.Do(request)
+	response, responseError := client.Do(request)
 	if responseError != nil {
 		return responseError
 	}
@@ -79,11 +93,14 @@ func handleIdentification(token string, server string) error {
 			identificationResponse.CN)
 	}
 
-	validUntil, _ := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
-	daysLeft := time.Until(validUntil).Hours() / 24
-
-	if daysLeft < 30 {
-		log.Printf("Careful! Certificates expire in %v days\n", daysLeft)
+	validUntil, parseError := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
+	if parseError == nil {
+		fmt.Fprintln(os.Stderr, "Couldn't parse valid_until field,", parseError)
+	} else {
+		daysLeft := time.Until(validUntil).Hours() / 24
+		if daysLeft < 30 {
+			log.Printf("Careful! Certificates expire in %v days\n", daysLeft)
+		}
 	}
 
 	clientConfig.Settings.PrivatePEMPath = clientConfig.ClientConfigPath + hostname + ".key"
@@ -119,10 +136,10 @@ func handleProvisioning(flavor string) error {
 	return nil
 }
 
-func handleRegistration(token string, server string, flavor string) (error, int) {
+func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	if identifyError := handleIdentification(token, server); identifyError != nil {
+	if identifyError := handleIdentification(token, server, insecure); identifyError != nil {
 		return identifyError, 1
 	}
 	if provisioningError := handleProvisioning(flavor); provisioningError != nil {

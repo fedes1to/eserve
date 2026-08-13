@@ -14,6 +14,7 @@ func parseArgs() (error, int) {
 	token := flag.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
 	server := flag.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
 	flavor := flag.String("flavor", "", "Flavor name used on registration, will default to hostname")
+	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING, only applies on register")
 
 	flag.Parse()
 
@@ -23,7 +24,7 @@ func parseArgs() (error, int) {
 		if *flavor == "" {
 			*flavor, _ = os.Hostname()
 		}
-		return handleRegistration(*token, *server, *flavor)
+		return handleRegistration(*token, *server, *flavor, *insecure)
 	} else {
 		if configError := clientConfig.LoadClientSettings(); configError != nil {
 			return configError, 1
