@@ -56,6 +56,18 @@ func IsTokenAvailable(token string) bool {
 	return tokenExists
 }
 
+func ValidCN(token string, cn string) bool {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+
+	entry, exists := tokens.Entries[token]
+	if !exists || cn == "" || cn != entry.CN {
+		return false
+	}
+
+	return true
+}
+
 func UseToken(token string, cn string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()

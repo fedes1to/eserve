@@ -4,6 +4,8 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
+var path = fetchServerPath()
+
 type ServerSettings struct {
 	ListenAddr     string `json:"listen_addr"`
 	BuildThreads   string `json:"build_threads"`

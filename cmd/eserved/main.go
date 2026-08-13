@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"log"
+
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 )
 
 func parseArgs() {
@@ -14,5 +16,6 @@ func parseArgs() {
 
 func main() {
 	log.Println("Starting eserved...")
+	serverConfig.InitializeCaCertificate()
 	parseArgs()
 }
