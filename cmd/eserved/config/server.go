@@ -1,4 +1,4 @@
-package config
+package serverConfig
 
 import (
 	"git.fedesito.me/fedes1to/eserve/internal/config"
