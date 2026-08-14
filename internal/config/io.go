@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 )
 
@@ -14,7 +13,7 @@ func SafeSaveJsonFile(path string, from any) error {
 	oldJson, openError := os.Open(path)
 	backupJson, backupError := os.Create(backupPath)
 
-	if openError != nil && !errors.Is(openError, fs.ErrNotExist) {
+	if openError != nil && !errors.Is(openError, os.ErrNotExist) {
 		fmt.Fprintln(os.Stderr, "Couldn't open old JSON for backup,", openError)
 	} else if backupError != nil {
 		fmt.Fprintln(os.Stderr, "Couldn't access target backup JSON,", backupError)

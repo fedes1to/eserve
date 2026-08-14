@@ -20,6 +20,35 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
+var mtlsClient *http.Client
+
+// config must be populated to call this method
+func initializeMtlsClient() error {
+	certificate, certificateError := tls.LoadX509KeyPair(clientConfig.Settings.CertPath, clientConfig.Settings.PrivatePEMPath)
+	if certificateError != nil {
+		return certificateError
+	}
+
+	certificatePEM, pemError := os.ReadFile(clientConfig.Settings.CAPath)
+	if pemError != nil {
+		return pemError
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(certificatePEM)
+
+	mtlsClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				Certificates: []tls.Certificate{certificate},
+				RootCAs:      certPool,
+				MinVersion:   tls.VersionTLS13,
+			},
+		},
+	}
+
+	return nil
+}
+
 func handleIdentification(token string, server string, insecure bool) error {
 	// making the certs and CSR
 	_, privKey, keyError := ed25519.GenerateKey(rand.Reader)
@@ -62,27 +91,9 @@ func handleIdentification(token string, server string, insecure bool) error {
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", "application/json")
 
-	response, responseError := client.Do(request)
-	if responseError != nil {
-		return responseError
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode != 200 {
-		bodyBytes, ioError := io.ReadAll(response.Body)
-		if ioError != nil {
-			return fmt.Errorf("Invalid response, got code %v without body due to: %w",
-				response.StatusCode, ioError)
-		}
-		return fmt.Errorf("Invalid response, got code %v with body:\n%v",
-			response.StatusCode, string(bodyBytes))
-	}
-
-	// decode json to struct
 	var identificationResponse protocol.IdentificationResponse
-	jsonError := json.NewDecoder(response.Body).Decode(&identificationResponse)
-	if jsonError != nil {
-		return jsonError
+	if requestError := sendRequest(request, &identificationResponse, client); requestError != nil {
+		return requestError
 	}
 
 	// checks to be nice n shit
@@ -94,7 +105,7 @@ func handleIdentification(token string, server string, insecure bool) error {
 	}
 
 	validUntil, parseError := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
-	if parseError == nil {
+	if parseError != nil {
 		fmt.Fprintln(os.Stderr, "Couldn't parse valid_until field,", parseError)
 	} else {
 		daysLeft := time.Until(validUntil).Hours() / 24
@@ -118,7 +129,40 @@ func handleIdentification(token string, server string, insecure bool) error {
 	}
 
 	return nil
+}
 
+func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client) error {
+	response, responseError := httpClient.Do(request)
+	if responseError != nil {
+		return responseError
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		bodyBytes, ioError := io.ReadAll(response.Body)
+		if ioError != nil {
+			return fmt.Errorf("Invalid response, got code %v without body due to: %w",
+				response.StatusCode, ioError)
+		}
+		return fmt.Errorf("Invalid response, got code %v with body:\n%v",
+			response.StatusCode, string(bodyBytes))
+	}
+
+	// decode json to struct
+	jsonError := json.NewDecoder(response.Body).Decode(into)
+	if jsonError != nil {
+		return jsonError
+	}
+
+	return nil
+}
+
+func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
+	body, _ := json.Marshal(payload)
+	request, _ := http.NewRequest("POST", clientConfig.Settings.Server+subUrl, bytes.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+
+	return sendRequest(request, into, mtlsClient)
 }
 
 func handleProvisioning(flavor string) error {
@@ -132,7 +176,15 @@ func handleProvisioning(flavor string) error {
 	log.Println("Found subarch:", cpuSubarch)
 
 	// construct JSON provisioning payload
-	//payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
+	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor, UploadPkgs: false}
+	var provisionResponse protocol.ProvisionResponse
+	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
+	if requestError != nil {
+		return requestError
+	}
+
+	
+
 	return nil
 }
 
@@ -141,6 +193,9 @@ func handleRegistration(token string, server string, flavor string, insecure boo
 
 	if identifyError := handleIdentification(token, server, insecure); identifyError != nil {
 		return identifyError, 1
+	}
+	if mtlsError := initializeMtlsClient(); mtlsError != nil {
+		return mtlsError, 1
 	}
 	if provisioningError := handleProvisioning(flavor); provisioningError != nil {
 		return provisioningError, 1

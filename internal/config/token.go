@@ -3,7 +3,6 @@ package config
 import (
 	"crypto/rand"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 )
@@ -91,7 +90,6 @@ func isTokenAvailableLocked(token string) bool {
 		if _, machineExists := machines.Entries[token]; machineExists {
 			return false
 		}
-		log.Println("Token is used but not in machines, continuing...")
 	}
 	return true
 }

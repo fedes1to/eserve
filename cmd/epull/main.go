@@ -29,6 +29,9 @@ func parseArgs() (error, int) {
 		if configError := clientConfig.LoadClientSettings(); configError != nil {
 			return configError, 1
 		}
+		if mtlsError := initializeMtlsClient(); mtlsError != nil {
+			return mtlsError, 1
+		}
 	}
 
 	return nil, 0
