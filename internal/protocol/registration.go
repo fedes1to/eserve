@@ -6,7 +6,6 @@ type IdentificationRequest struct {
 
 type IdentificationResponse struct {
 	Certificate string `json:"cert"`
-	CA          string `json:"ca"`
 	CN          string `json:"cn"`
 	ValidUntil  string `json:"valid_until"`
 }
@@ -18,5 +17,4 @@ type ProvisionRequest struct {
 }
 
 type ProvisionResponse struct {
-	
 }

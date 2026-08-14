@@ -8,7 +8,6 @@ type ClientSettings struct {
 	PrivatePEMPath string `json:"pem_path"`
 	Server         string `json:"server"`
 	CertPath       string `json:"cert_path"`
-	CAPath         string `json:"ca_path"`
 }
 
 var Settings ClientSettings // i cant come up with a better naming system

@@ -23,26 +23,24 @@ import (
 var mtlsClient *http.Client
 
 // config must be populated to call this method
-func initializeMtlsClient() error {
+func initializeMtlsClient(insecure bool) error {
 	certificate, certificateError := tls.LoadX509KeyPair(clientConfig.Settings.CertPath, clientConfig.Settings.PrivatePEMPath)
 	if certificateError != nil {
 		return certificateError
 	}
 
-	certificatePEM, pemError := os.ReadFile(clientConfig.Settings.CAPath)
-	if pemError != nil {
-		return pemError
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{certificate},
+		MinVersion:   tls.VersionTLS13,
 	}
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(certificatePEM)
+
+	if insecure {
+		tlsConfig.InsecureSkipVerify = true
+	}
 
 	mtlsClient = &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				Certificates: []tls.Certificate{certificate},
-				RootCAs:      certPool,
-				MinVersion:   tls.VersionTLS13,
-			},
+			TLSClientConfig: tlsConfig,
 		},
 	}
 
@@ -116,12 +114,10 @@ func handleIdentification(token string, server string, insecure bool) error {
 
 	clientConfig.Settings.PrivatePEMPath = clientConfig.ClientConfigPath + hostname + ".key"
 	clientConfig.Settings.CertPath = clientConfig.ClientConfigPath + hostname + ".crt"
-	clientConfig.Settings.CAPath = clientConfig.ClientConfigPath + "ca.crt"
 	clientConfig.Settings.Server = server
 
 	// assuming everything went well here, so we save the request
 	os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644)
-	os.WriteFile(clientConfig.Settings.CAPath, []byte(identificationResponse.CA), 0644)
 	os.WriteFile(clientConfig.Settings.PrivatePEMPath, keyPEM, 0600)
 
 	if saveError := clientConfig.SaveClientSettings(); saveError != nil {
@@ -183,8 +179,6 @@ func handleProvisioning(flavor string) error {
 		return requestError
 	}
 
-	
-
 	return nil
 }
 
@@ -194,7 +188,7 @@ func handleRegistration(token string, server string, flavor string, insecure boo
 	if identifyError := handleIdentification(token, server, insecure); identifyError != nil {
 		return identifyError, 1
 	}
-	if mtlsError := initializeMtlsClient(); mtlsError != nil {
+	if mtlsError := initializeMtlsClient(insecure); mtlsError != nil {
 		return mtlsError, 1
 	}
 	if provisioningError := handleProvisioning(flavor); provisioningError != nil {

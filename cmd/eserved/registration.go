@@ -20,7 +20,7 @@ import (
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !config.IsTokenAvailable(token) {
-		log.Printf("%v Attempted login with invalid token %v\n", clientIP(r), token)
+		log.Printf("%v Attempted login with invalid token\n", clientIP(r))
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
@@ -69,7 +69,6 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 
 	response := protocol.IdentificationResponse{
 		Certificate: string(certPEM),
-		CA:          string(serverConfig.CaCertificatePEM),
 		CN:          csr.Subject.CommonName,
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}

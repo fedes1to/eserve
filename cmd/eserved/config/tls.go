@@ -17,19 +17,20 @@ import (
 var TlsCertificate tls.Certificate
 
 func LoadTlsCertificates() error {
-	cert, certError := tls.LoadX509KeyPair(Settings.TlsCertPath, Settings.TlsKeyPath)
-	if certError == nil {
-		TlsCertificate = cert
-		return nil
-	}
-	if !errors.Is(certError, os.ErrNotExist) {
-		return fmt.Errorf("Failed loading server cert: %w", certError)
+	if _, statError := os.Stat(Settings.TlsCertPath); errors.Is(statError, os.ErrNotExist) {
+		log.Println("no server cert found, generating self-signed cert")
+		if generateError := generateSelfSigned(); generateError != nil {
+			return generateError
+		}
+	} else if statError != nil {
+		return fmt.Errorf("checking server cert: %w", statError)
 	}
 
-	log.Println("no server cert found, generating self-signed cert")
-	if generateError := generateSelfSigned(); generateError != nil {
-		return generateError
+	cert, certError := tls.LoadX509KeyPair(Settings.TlsCertPath, Settings.TlsKeyPath)
+	if certError != nil {
+		return fmt.Errorf("loading server cert: %w", certError)
 	}
+	TlsCertificate = cert
 	return nil
 }
 
