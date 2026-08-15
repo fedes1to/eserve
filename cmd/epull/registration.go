@@ -19,6 +19,7 @@ import (
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
 	"git.fedesito.me/fedes1to/eserve/internal/initialization"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
+	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
 
 var mtlsClient *http.Client
@@ -164,16 +165,20 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 
 func handleProvisioning(flavor string) error {
 	// Provisioning
-	cpuSubarch, subarchError := getCpuSubarch()
-
+	cpuSubarch, subarchError := sysinfo.GetCpuMarch()
 	if subarchError != nil {
 		return subarchError
 	}
 
-	log.Println("Found subarch:", cpuSubarch)
+	cpuChost, chostError := sysinfo.GetCpuChost()
+	if chostError != nil {
+		return chostError
+	}
+
+	log.Printf("Found arch %v with subarch %v\n", cpuChost, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
+	payload := protocol.ProvisionRequest{Arch: cpuChost, SubArch: cpuSubarch, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
 	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if requestError != nil {

@@ -11,6 +11,7 @@ type IdentificationResponse struct {
 }
 
 type ProvisionRequest struct {
+	Arch    string `json:"arch"`
 	SubArch string `json:"sub_arch"`
 	Flavor  string `json:"flavor"`
 }
