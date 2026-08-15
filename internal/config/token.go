@@ -58,9 +58,7 @@ func CreateToken() (string, error) {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
-	tokenBytes := make([]byte, 32)
-	rand.Read(tokenBytes)
-	token := fmt.Sprintf("%x", tokenBytes)
+	token := rand.Text()
 
 	if _, tokenExists := tokens.Entries[token]; tokenExists {
 		return "", fmt.Errorf("Token already exists... You just stumbled on something almost impossible, or something is really fucked with your PC, Bye!")

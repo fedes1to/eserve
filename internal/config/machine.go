@@ -5,7 +5,9 @@ import (
 )
 
 type MachineEntry struct {
-	March       string `json:"march"`
+	Arch        string `json:"arch"`
+	Subarch     string `json:"march"`
+	Libc        string `json:"libc"`
 	Flavor      string `json:"flavor"`
 	Fingerprint string `json:"fingerprint"`
 }
@@ -51,13 +53,15 @@ func loadMachinesLocked() error {
 	return nil
 }
 
-func ProvisionMachine(cn, march, flavor string) error {
+func ProvisionMachine(cn, arch, subarch, libc, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
 	entry := MachineEntry{
-		March:  march,
-		Flavor: flavor,
+		Arch:    arch,
+		Subarch: subarch,
+		Libc:    libc,
+		Flavor:  flavor,
 	}
 	machines.Entries[cn] = entry
 	return saveMachinesLocked()

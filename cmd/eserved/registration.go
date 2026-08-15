@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"log"
@@ -77,6 +79,11 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fingerprint := sha256.Sum256(certificate)
+	if upsertError := config.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
+		http.Error(w, "couldn't upsert machine", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	if encodeError := json.NewEncoder(w).Encode(response); encodeError != nil {
 		http.Error(w, "couldn't encode response", http.StatusInternalServerError)
@@ -85,5 +92,19 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 }
 
 func postProvision(w http.ResponseWriter, r *http.Request) {
-	// gotta make this method i guess
+	var provisionRequest protocol.ProvisionRequest
+	decodeError := json.NewDecoder(r.Body).Decode(&provisionRequest)
+
+	if decodeError != nil {
+		http.Error(w, "couldn't decode provisionRequest", http.StatusBadRequest)
+		return
+	}
+
+	identity := r.Context().Value(ctxKeyIdentity).(ClientIdentity)
+	provisionError := config.ProvisionMachine(identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Libc, provisionRequest.Flavor)
+	if provisionError != nil {
+		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)
+		return
+	}
+
 }

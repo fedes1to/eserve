@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
@@ -15,7 +16,15 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
-var socketPath = "/run/eserved.sock"
+const (
+	socketPath     = "/run/eserved.sock"
+	ctxKeyIdentity = "client_identity"
+)
+
+type ClientIdentity struct {
+	CN          string
+	Fingerprint string
+}
 
 func clientIP(r *http.Request) string {
 	proxyIpHeader := r.Header.Get("X-Forwarded-For")
@@ -37,13 +46,20 @@ func requireClientCert(next http.Handler) http.Handler {
 		cn := peerCertificate.Subject.CommonName
 
 		fingerprint := sha256.Sum256(peerCertificate.Raw)
-		if !config.MachineCertValid(cn, hex.EncodeToString(fingerprint[:])) {
+		fingerprintHex := hex.EncodeToString(fingerprint[:])
+		if !config.MachineCertValid(cn, fingerprintHex) {
 			log.Printf("%v Attempted request with invalid certificate\n", clientIP(r))
 			http.Error(w, "unknown or revoked machine", http.StatusUnauthorized)
 			return
 		}
 
-		next.ServeHTTP(w, r)
+		identity := ClientIdentity{
+			CN:          peerCertificate.Subject.CommonName,
+			Fingerprint: fingerprintHex,
+		}
+
+		ctx := context.WithValue(r.Context(), ctxKeyIdentity, identity)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

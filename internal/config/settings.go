@@ -6,7 +6,7 @@ import (
 )
 
 // hardcoding go brrr i guess
-var (
+const (
 	ServerConfigPath = "/etc/eserved/"
 	ClientConfigPath = "/etc/epull/"
 )
