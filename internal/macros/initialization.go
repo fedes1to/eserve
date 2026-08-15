@@ -1,4 +1,4 @@
-package initialization
+package macros
 
 import (
 	"fmt"

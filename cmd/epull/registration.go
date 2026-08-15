@@ -17,7 +17,7 @@ import (
 	"time"
 
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
-	"git.fedesito.me/fedes1to/eserve/internal/initialization"
+	"git.fedesito.me/fedes1to/eserve/internal/macros"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
@@ -191,7 +191,7 @@ func handleProvisioning(flavor string) error {
 func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	return initialization.MustRegister([]initialization.InitStep{
+	return macros.MustRegister([]macros.InitStep{
 		{Name: "identity", Function: func() error { return handleIdentification(token, server, insecure) }},
 		{Name: "mtls client", Function: func() error { return initializeMtlsClient(insecure) }},
 		{Name: "provisioning", Function: func() error { return handleProvisioning(flavor) }},
