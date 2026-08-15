@@ -1,14 +1,12 @@
 package config
 
 import (
-	"fmt"
 	"sync"
 )
 
 type MachineEntry struct {
 	March       string `json:"march"`
 	Flavor      string `json:"flavor"`
-	Threads     int    `json:"threads"` // 0 if not specified (unlimited)
 	Fingerprint string `json:"fingerprint"`
 }
 
@@ -53,26 +51,35 @@ func loadMachinesLocked() error {
 	return nil
 }
 
-// there should be a better way to do this, go please add func overloading please
-func CreateMachine(hostname string, march string, flavor string, fingerprint string, threads ...int) error {
-	var actualThreads int // go is just stupid like that
-	if len(threads) > 0 {
-		actualThreads = threads[0]
-	} else {
-		actualThreads = 0
-	}
-
+func ProvisionMachine(cn, march, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
-	entry, entryExists := machines.Entries[hostname]
-	if entryExists {
-		return fmt.Errorf("Tried to add an existing machine")
+	entry := MachineEntry{
+		March:  march,
+		Flavor: flavor,
 	}
-
-	entry.March = march
-	entry.Flavor = flavor
-	entry.Threads = actualThreads
-	machines.Entries[hostname] = entry
+	machines.Entries[cn] = entry
 	return saveMachinesLocked()
+}
+
+func UpsertMachine(cn, fingerprint string) error {
+	machinesMutex.Lock()
+	defer machinesMutex.Unlock()
+
+	entry := MachineEntry{
+		Fingerprint: fingerprint,
+	}
+	machines.Entries[cn] = entry
+	return saveMachinesLocked()
+}
+
+func MachineCertValid(cn, fingerprint string) bool {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+	entry, exists := machines.Entries[cn]
+	if !exists {
+		return false
+	}
+	return entry.Fingerprint != "" && entry.Fingerprint == fingerprint
 }

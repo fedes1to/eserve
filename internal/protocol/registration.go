@@ -11,9 +11,8 @@ type IdentificationResponse struct {
 }
 
 type ProvisionRequest struct {
-	SubArch    string `json:"sub_arch"`
-	Flavor     string `json:"flavor"`
-	UploadPkgs bool   `json:"upload_pkgs"`
+	SubArch string `json:"sub_arch"`
+	Flavor  string `json:"flavor"`
 }
 
 type ProvisionResponse struct {

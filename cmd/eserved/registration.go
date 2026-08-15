@@ -16,11 +16,10 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
-// TODO: fail after ban / rate limit
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !config.IsTokenAvailable(token) {
-		log.Printf("%v Attempted login with invalid token\n", clientIP(r))
+		log.Printf("%v Attempted identification with invalid token\n", clientIP(r))
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}

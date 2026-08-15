@@ -9,7 +9,7 @@ import (
 )
 
 func SafeSaveJsonFile(path string, from any) error {
-	backupPath := path + ".bak"
+	backupPath := path + ".old"
 	oldJson, openError := os.Open(path)
 	backupJson, backupError := os.Create(backupPath)
 
@@ -26,7 +26,7 @@ func SafeSaveJsonFile(path string, from any) error {
 		defer backupJson.Close()
 	}
 
-	// truncates if it exists, thats why we made a .bak
+	// truncates if it exists, thats why we made a .old
 	jsonFile, createError := os.Create(path)
 	if createError != nil {
 		return createError
@@ -34,6 +34,7 @@ func SafeSaveJsonFile(path string, from any) error {
 	defer jsonFile.Close()
 
 	encoder := json.NewEncoder(jsonFile)
+	encoder.SetIndent("", "  ") // make it tolerable to see
 	if encodeError := encoder.Encode(from); encodeError != nil {
 		return encodeError
 	}

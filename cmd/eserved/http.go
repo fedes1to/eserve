@@ -1,14 +1,18 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
 	"os"
 	"strings"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 var socketPath = "/run/eserved.sock"
@@ -29,7 +33,16 @@ func requireClientCert(next http.Handler) http.Handler {
 			http.Error(w, "client certificate required", http.StatusUnauthorized)
 			return
 		}
-		// TODO: check fingerprint from machines.json
+		peerCertificate := r.TLS.PeerCertificates[0]
+		cn := peerCertificate.Subject.CommonName
+
+		fingerprint := sha256.Sum256(peerCertificate.Raw)
+		if !config.MachineCertValid(cn, hex.EncodeToString(fingerprint[:])) {
+			log.Printf("%v Attempted request with invalid certificate\n", clientIP(r))
+			http.Error(w, "unknown or revoked machine", http.StatusUnauthorized)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }

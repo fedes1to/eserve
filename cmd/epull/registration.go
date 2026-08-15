@@ -17,6 +17,7 @@ import (
 	"time"
 
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
+	"git.fedesito.me/fedes1to/eserve/internal/initialization"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
@@ -172,7 +173,7 @@ func handleProvisioning(flavor string) error {
 	log.Println("Found subarch:", cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor, UploadPkgs: false}
+	payload := protocol.ProvisionRequest{SubArch: cpuSubarch, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
 	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if requestError != nil {
@@ -185,14 +186,10 @@ func handleProvisioning(flavor string) error {
 func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	if identifyError := handleIdentification(token, server, insecure); identifyError != nil {
-		return identifyError, 1
-	}
-	if mtlsError := initializeMtlsClient(insecure); mtlsError != nil {
-		return mtlsError, 1
-	}
-	if provisioningError := handleProvisioning(flavor); provisioningError != nil {
-		return provisioningError, 1
-	}
-	return nil, 0
+	return initialization.MustRegister([]initialization.InitStep{
+		{Name: "identity", Function: func() error { return handleIdentification(token, server, insecure) }},
+		{Name: "mtls client", Function: func() error { return initializeMtlsClient(insecure) }},
+		{Name: "provisioning", Function: func() error { return handleProvisioning(flavor) }},
+	})
+
 }
