@@ -165,12 +165,12 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 
 func handleProvisioning(flavor string) error {
 	// Provisioning
-	cpuSubarch, subarchError := sysinfo.GetCpuMarch()
+	cpuSubarch, subarchError := sysinfo.GetCpuSubarch()
 	if subarchError != nil {
 		return subarchError
 	}
 
-	cpuChost, chostError := sysinfo.GetCpuChost()
+	cpuChost, libc, chostError := sysinfo.GetGccMachine()
 	if chostError != nil {
 		return chostError
 	}
@@ -178,7 +178,7 @@ func handleProvisioning(flavor string) error {
 	log.Printf("Found arch %v with subarch %v\n", cpuChost, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{Arch: cpuChost, SubArch: cpuSubarch, Flavor: flavor}
+	payload := protocol.ProvisionRequest{Arch: cpuChost, Subarch: cpuSubarch, Flavor: flavor, Libc: libc}
 	var provisionResponse protocol.ProvisionResponse
 	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if requestError != nil {

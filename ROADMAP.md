@@ -8,6 +8,7 @@ Simple roadmap to check progress/features
 - token creation logic
 
 ## TODO (atm)
+- /api/v1/provision
 - almost everything cuh
 
 ## PLANNED

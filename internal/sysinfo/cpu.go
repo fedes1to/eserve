@@ -20,12 +20,20 @@ func getPortageMarch() (string, error) {
 	return "", nil // absent
 }
 
-func GetCpuChost() (string, error) {
+func GetGccMachine() (string, string, error) {
 	cmdOutput, cmdError := exec.Command("gcc", "-dumpmachine").Output()
 	if cmdError != nil {
-		return "", fmt.Errorf("Failed to execute gcc, %w", cmdError)
+		return "", "", fmt.Errorf("Failed to execute gcc, %w", cmdError)
 	}
-	return strings.TrimSpace(string(cmdOutput)), nil
+
+	parts := strings.Split(strings.TrimSpace(string(cmdOutput)), "-")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("unexpected gcc -dumpmachine output: %q", string(cmdOutput))
+	}
+
+	arch := parts[0]
+	libc := parts[len(parts)-1]
+	return arch, libc, nil
 }
 
 func getGccMarch() (string, error) {
@@ -42,8 +50,7 @@ func getGccMarch() (string, error) {
 	return "", fmt.Errorf("Failed to get CPU subarch")
 }
 
-// returns CPU subarch using gcc
-func GetCpuMarch() (string, error) {
+func GetCpuSubarch() (string, error) {
 	portageMarch, portageError := getPortageMarch()
 	if portageError != nil {
 		return "", portageError

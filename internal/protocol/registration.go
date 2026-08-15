@@ -12,9 +12,13 @@ type IdentificationResponse struct {
 
 type ProvisionRequest struct {
 	Arch    string `json:"arch"`
-	SubArch string `json:"sub_arch"`
+	Subarch string `json:"sub_arch"`
+	Libc    string `json:"libc"`
 	Flavor  string `json:"flavor"`
 }
 
 type ProvisionResponse struct {
+	JobID      string `json:"job_id,omitempty"`
+	BinhostURL string `json:"binhost_url"`
+	NewChroot  bool   `json:"new_chroot"`
 }
