@@ -13,3 +13,6 @@ Gentoo for now, it is NOT WORKING as of now
 
 idea is to have it sync USE flags and also allow to have similar systems easily
 (reproducibility)
+
+### Dependencies (planned)
+- [bubblewrap](https://github.com/containers/bubblewrap)
