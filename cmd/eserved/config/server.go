@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"git.fedesito.me/fedes1to/eserve/internal/config"
+	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
 
 type ServerSettings struct {
@@ -17,10 +18,22 @@ type ServerSettings struct {
 	TlsKeyPath     string `json:"tls_key_path"`
 }
 
-var Settings ServerSettings // i cant come up with a better naming system
+var (
+	Settings           ServerSettings // i cant come up with a better naming system
+	ServerConfigPath   string         = config.InitConfigPath(config.ServerConfigPath)
+	serverSettingsPath string         = ServerConfigPath + "settings.json"
+	ServerArch         string
+	ServerLibc         string
+)
 
-var ServerConfigPath string = config.InitConfigPath(config.ServerConfigPath)
-var serverSettingsPath string = ServerConfigPath + "settings.json"
+func LoadServerSysinfo() error {
+	arch, libc, gccError := sysinfo.GetGccMachine()
+	if gccError != nil {
+		return gccError
+	}
+	ServerArch, ServerLibc = arch, libc
+	return nil
+}
 
 // populates global var Server
 func LoadServerSettings() error {

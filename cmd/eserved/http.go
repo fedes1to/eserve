@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
-	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 const (
@@ -47,7 +46,7 @@ func requireClientCert(next http.Handler) http.Handler {
 
 		fingerprint := sha256.Sum256(peerCertificate.Raw)
 		fingerprintHex := hex.EncodeToString(fingerprint[:])
-		if !config.MachineCertValid(cn, fingerprintHex) {
+		if !serverConfig.MachineCertValid(cn, fingerprintHex) {
 			log.Printf("%v Attempted request with invalid certificate\n", clientIP(r))
 			http.Error(w, "unknown or revoked machine", http.StatusUnauthorized)
 			return

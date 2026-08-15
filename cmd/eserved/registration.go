@@ -14,13 +14,12 @@ import (
 	"time"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
-	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !config.IsTokenAvailable(token) {
+	if !serverConfig.IsTokenAvailable(token) {
 		log.Printf("%v Attempted identification with invalid token\n", clientIP(r))
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
@@ -45,7 +44,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !config.ValidCN(token, csr.Subject.CommonName) {
+	if !serverConfig.ValidCN(token, csr.Subject.CommonName) {
 		http.Error(w, "invalid cn or mismatch", http.StatusBadRequest)
 		return
 	}
@@ -74,13 +73,13 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if tokenError := config.UseToken(token, csr.Subject.CommonName); tokenError != nil {
+	if tokenError := serverConfig.UseToken(token, csr.Subject.CommonName); tokenError != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}
 
 	fingerprint := sha256.Sum256(certificate)
-	if upsertError := config.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
+	if upsertError := serverConfig.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
 		http.Error(w, "couldn't upsert machine", http.StatusInternalServerError)
 		return
 	}
@@ -94,14 +93,13 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 func postProvision(w http.ResponseWriter, r *http.Request) {
 	var provisionRequest protocol.ProvisionRequest
 	decodeError := json.NewDecoder(r.Body).Decode(&provisionRequest)
-
 	if decodeError != nil {
 		http.Error(w, "couldn't decode provisionRequest", http.StatusBadRequest)
 		return
 	}
 
 	identity := r.Context().Value(ctxKeyIdentity).(ClientIdentity)
-	provisionError := config.ProvisionMachine(identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Libc, provisionRequest.Flavor)
+	provisionError := serverConfig.ProvisionMachine(identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Libc, provisionRequest.Flavor)
 	if provisionError != nil {
 		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)
 		return

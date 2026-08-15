@@ -14,7 +14,7 @@ func parseArgs() (error, int) {
 	token := flag.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
 	server := flag.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
 	flavor := flag.String("flavor", "", "Flavor name used on registration, will default to hostname")
-	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING, only applies on register")
+	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 
 	flag.Parse()
 

@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"git.fedesito.me/fedes1to/eserve/internal/config"
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 )
 
 func postCreateToken(w http.ResponseWriter, r *http.Request) {
-	token, tokenError := config.CreateToken()
+	token, tokenError := serverConfig.CreateToken()
 
 	if tokenError != nil {
 		fmt.Fprintln(os.Stderr, "failed to create token,", tokenError)

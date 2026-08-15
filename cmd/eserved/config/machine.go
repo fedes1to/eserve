@@ -1,7 +1,10 @@
-package config
+package serverConfig
 
 import (
+	"fmt"
 	"sync"
+
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 type MachineEntry struct {
@@ -20,7 +23,7 @@ type MachinesFile struct {
 var (
 	machines      MachinesFile
 	machinesMutex sync.RWMutex
-	machinesPath  string = ServerConfigPath + "machines.json"
+	machinesPath  = ServerConfigPath + "machines.json"
 )
 
 func LoadMachines() error {
@@ -34,7 +37,7 @@ func LoadMachines() error {
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func saveMachinesLocked() error {
-	if saveError := SafeSaveJsonFile(machinesPath, machines); saveError != nil {
+	if saveError := config.SafeSaveJsonFile(machinesPath, machines); saveError != nil {
 		return saveError
 	}
 	return nil
@@ -42,7 +45,7 @@ func saveMachinesLocked() error {
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func loadMachinesLocked() error {
-	if loadError := LoadJsonFile(machinesPath, &machines); loadError != nil {
+	if loadError := config.LoadJsonFile(machinesPath, &machines); loadError != nil {
 		return loadError
 	}
 
@@ -57,6 +60,10 @@ func ProvisionMachine(cn, arch, subarch, libc, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
+	if arch != ServerArch {
+		return fmt.Errorf("Architecture mismatch, crossdev support not yet implemented")
+	}
+
 	entry := MachineEntry{
 		Arch:    arch,
 		Subarch: subarch,
@@ -65,6 +72,17 @@ func ProvisionMachine(cn, arch, subarch, libc, flavor string) error {
 	}
 	machines.Entries[cn] = entry
 	return saveMachinesLocked()
+}
+
+func IsMachineCrossdev(cn string) bool {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	if machines.Entries[cn].Arch != ServerArch {
+		return true
+	}
+
+	return false
 }
 
 func UpsertMachine(cn, fingerprint string) error {

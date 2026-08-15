@@ -1,10 +1,12 @@
-package config
+package serverConfig
 
 import (
 	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
+
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 // these are pretty much only for logging the tokens and registering
@@ -35,7 +37,7 @@ func LoadTokens() error {
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func saveTokensLocked() error {
-	if saveError := SafeSaveJsonFile(tokensPath, tokens); saveError != nil {
+	if saveError := config.SafeSaveJsonFile(tokensPath, tokens); saveError != nil {
 		return saveError
 	}
 	return nil
@@ -43,7 +45,7 @@ func saveTokensLocked() error {
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func loadTokensLocked() error {
-	if loadError := LoadJsonFile(tokensPath, &tokens); loadError != nil {
+	if loadError := config.LoadJsonFile(tokensPath, &tokens); loadError != nil {
 		return loadError
 	}
 

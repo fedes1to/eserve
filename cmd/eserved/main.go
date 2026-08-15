@@ -5,7 +5,6 @@ import (
 	"log"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
-	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/initialization"
 )
 
@@ -21,10 +20,11 @@ func main() {
 
 	steps := []initialization.InitStep{
 		{Name: "settings", Function: serverConfig.InitializeServerSettings},
+		{Name: "sysinfo", Function: serverConfig.LoadServerSysinfo},
 		{Name: "ca certificate", Function: serverConfig.LoadCaCertificate},
 		{Name: "tls certificate", Function: serverConfig.LoadTlsCertificates},
-		{Name: "tokens", Function: config.LoadTokens},
-		{Name: "machines", Function: config.LoadMachines},
+		{Name: "tokens", Function: serverConfig.LoadTokens},
+		{Name: "machines", Function: serverConfig.LoadMachines},
 	}
 
 	initialization.MustInit(steps)
