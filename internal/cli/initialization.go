@@ -1,4 +1,4 @@
-package macros
+package cli
 
 import (
 	"fmt"

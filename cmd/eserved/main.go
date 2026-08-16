@@ -5,7 +5,7 @@ import (
 	"log"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
-	"git.fedesito.me/fedes1to/eserve/internal/macros"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
 func parseArgs() {
@@ -18,7 +18,7 @@ func parseArgs() {
 func main() {
 	log.Println("Starting eserved...")
 
-	steps := []macros.InitStep{
+	steps := []cli.InitStep{
 		{Name: "settings", Function: serverConfig.InitializeServerSettings},
 		{Name: "sysinfo", Function: serverConfig.LoadServerSysinfo},
 		{Name: "ca certificate", Function: serverConfig.LoadCaCertificate},
@@ -27,7 +27,7 @@ func main() {
 		{Name: "machines", Function: serverConfig.LoadMachines},
 	}
 
-	macros.MustInit(steps)
+	cli.MustInit(steps)
 
 	parseArgs()
 }

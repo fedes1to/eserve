@@ -2,36 +2,9 @@ package sysinfo
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 )
-
-func getPortageMarch() (string, error) {
-	output, portageError := exec.Command("portageq", "envvar", "CFLAGS").Output()
-	if portageError != nil {
-		return "", portageError
-	}
-	flags := string(output)
-	for flag := range strings.FieldsSeq(flags) {
-		if march, ok := strings.CutPrefix(flag, "-march="); ok {
-			return march, nil
-		}
-	}
-	return "", nil // absent
-}
-
-func GetPortageProfile() (string, error) {
-	makeLink, linkError := os.Readlink("/etc/portage/make.profile")
-	if linkError != nil {
-		return "", linkError
-	}
-	_, profile, found := strings.Cut(makeLink, "profiles/")
-	if !found {
-		return "", fmt.Errorf("unexpected make.profile target: %q", makeLink)
-	}
-	return profile, nil
-}
 
 func GetGccMachine() (string, string, error) {
 	cmdOutput, cmdError := exec.Command("gcc", "-dumpmachine").Output()
@@ -55,9 +28,9 @@ func getGccMarch() (string, error) {
 		return "", fmt.Errorf("Failed to execute gcc, %w", outputError)
 	}
 	for line := range strings.SplitSeq(string(output), "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 2 && f[0] == "-march=" {
-			return f[1], nil
+		field := strings.Fields(line)
+		if len(field) >= 2 && field[0] == "-march=" {
+			return field[1], nil
 		}
 	}
 	return "", fmt.Errorf("Failed to get CPU subarch")

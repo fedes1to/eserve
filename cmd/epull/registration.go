@@ -17,7 +17,7 @@ import (
 	"time"
 
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
-	"git.fedesito.me/fedes1to/eserve/internal/macros"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
@@ -196,7 +196,7 @@ func postProvisioning(flavor string) error {
 func handleProvision(flavor string) (error, int) {
 	log.Printf("Provisioning with flavor %v", flavor)
 
-	return macros.MustRegister([]macros.InitStep{
+	return cli.MustRegister([]cli.InitStep{
 		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
 	})
 }
@@ -204,7 +204,7 @@ func handleProvision(flavor string) (error, int) {
 func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	return macros.MustRegister([]macros.InitStep{
+	return cli.MustRegister([]cli.InitStep{
 		{Name: "identity", Function: func() error { return postIdentification(token, server, insecure) }},
 		{Name: "mtls client", Function: func() error { return initializeMtlsClient(insecure) }},
 		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},

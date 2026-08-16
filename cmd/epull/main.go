@@ -6,7 +6,7 @@ import (
 	"os"
 
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
-	"git.fedesito.me/fedes1to/eserve/internal/macros"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
 func parseRegister() (error, int) {
@@ -41,7 +41,7 @@ func parseProvision() (error, int) {
 
 func main() {
 	if len(os.Args) < 2 {
-		macros.PrintUsage("epull", []macros.Command{
+		cli.PrintUsage("epull", []cli.Command{
 			{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
 		})
 		os.Exit(2)

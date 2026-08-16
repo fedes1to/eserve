@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"git.fedesito.me/fedes1to/eserve/internal/macros"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
 func parseTokenFlags() (error, int) {
@@ -32,7 +32,7 @@ func parseTokenFlags() (error, int) {
 
 func main() {
 	if len(os.Args) < 2 {
-		macros.PrintUsage("epull", []macros.Command{
+		cli.PrintUsage("epull", []cli.Command{
 			{Name: "token", Description: "Generate a token used for registration"},
 		})
 		os.Exit(2)
