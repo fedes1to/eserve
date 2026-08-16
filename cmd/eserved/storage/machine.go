@@ -1,9 +1,10 @@
-package serverConfig
+package storage
 
 import (
 	"fmt"
 	"sync"
 
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
@@ -24,7 +25,7 @@ type MachinesFile struct {
 var (
 	machines      MachinesFile
 	machinesMutex sync.RWMutex
-	machinesPath  = ServerConfigPath + "machines.json"
+	machinesPath  = serverConfig.ServerConfigPath + "machines.json"
 )
 
 func LoadMachines() error {
@@ -66,7 +67,7 @@ func ProvisionMachine(cn, arch, subarch, profile, libc, flavor string) error {
 		return fmt.Errorf("machine %v has no certificate — run identity first", cn)
 	}
 
-	if arch != ServerArch {
+	if arch != serverConfig.ServerArch {
 		return fmt.Errorf("Architecture mismatch, crossdev support not yet implemented")
 	}
 
@@ -86,7 +87,7 @@ func IsMachineCrossdev(cn string) bool {
 	machinesMutex.RLock()
 	defer machinesMutex.RUnlock()
 
-	if machines.Entries[cn].Arch != ServerArch {
+	if machines.Entries[cn].Arch != serverConfig.ServerArch {
 		return true
 	}
 

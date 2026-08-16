@@ -1,4 +1,4 @@
-package serverConfig
+package storage
 
 import (
 	"crypto/ed25519"
@@ -12,12 +12,14 @@ import (
 	"log"
 	"os"
 	"time"
+
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 )
 
 var TlsCertificate tls.Certificate
 
 func LoadTlsCertificates() error {
-	if _, statError := os.Stat(Settings.TlsCertPath); errors.Is(statError, os.ErrNotExist) {
+	if _, statError := os.Stat(serverConfig.Settings.TlsCertPath); errors.Is(statError, os.ErrNotExist) {
 		log.Println("no server cert found, generating self-signed cert")
 		if generateError := generateSelfSigned(); generateError != nil {
 			return generateError
@@ -26,7 +28,7 @@ func LoadTlsCertificates() error {
 		return fmt.Errorf("checking server cert: %w", statError)
 	}
 
-	cert, certError := tls.LoadX509KeyPair(Settings.TlsCertPath, Settings.TlsKeyPath)
+	cert, certError := tls.LoadX509KeyPair(serverConfig.Settings.TlsCertPath, serverConfig.Settings.TlsKeyPath)
 	if certError != nil {
 		return fmt.Errorf("loading server cert: %w", certError)
 	}
@@ -55,7 +57,7 @@ func generateSelfSigned() error {
 	}
 
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate})
-	if writeError := os.WriteFile(Settings.TlsCertPath, certPEM, 0644); writeError != nil {
+	if writeError := os.WriteFile(serverConfig.Settings.TlsCertPath, certPEM, 0644); writeError != nil {
 		return writeError
 	}
 
@@ -64,5 +66,5 @@ func generateSelfSigned() error {
 		return keyError
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
-	return os.WriteFile(Settings.TlsKeyPath, keyPEM, 0600)
+	return os.WriteFile(serverConfig.Settings.TlsKeyPath, keyPEM, 0600)
 }

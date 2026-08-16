@@ -13,13 +13,13 @@ import (
 	"strings"
 	"time"
 
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 func postIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	if !serverConfig.IsTokenAvailable(token) {
+	if !storage.IsTokenAvailable(token) {
 		log.Printf("%v Attempted identification with invalid token\n", clientIP(r))
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
@@ -44,13 +44,13 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !serverConfig.ValidCN(token, csr.Subject.CommonName) {
+	if !storage.ValidCN(token, csr.Subject.CommonName) {
 		http.Error(w, "invalid cn or mismatch", http.StatusBadRequest)
 		return
 	}
 
 	template := &x509.Certificate{
-		SerialNumber: serverConfig.RandomSerial(),
+		SerialNumber: storage.RandomSerial(),
 		Subject:      pkix.Name{CommonName: csr.Subject.CommonName},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().AddDate(1, 0, 0), // 1 year
@@ -59,7 +59,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	certificate, certificateError := x509.CreateCertificate(rand.Reader, template,
-		serverConfig.CaCertificate, csr.PublicKey, serverConfig.CaKey)
+		storage.CaCertificate, csr.PublicKey, storage.CaKey)
 
 	if certificateError != nil {
 		http.Error(w, "signing cert failed", http.StatusInternalServerError)
@@ -73,13 +73,13 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if tokenError := serverConfig.UseToken(token, csr.Subject.CommonName); tokenError != nil {
+	if tokenError := storage.UseToken(token, csr.Subject.CommonName); tokenError != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}
 
 	fingerprint := sha256.Sum256(certificate)
-	if upsertError := serverConfig.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
+	if upsertError := storage.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
 		http.Error(w, "couldn't upsert machine", http.StatusInternalServerError)
 		return
 	}
@@ -99,7 +99,7 @@ func postProvision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	identity := r.Context().Value(ctxKeyIdentity).(ClientIdentity)
-	provisionError := serverConfig.ProvisionMachine(
+	provisionError := storage.ProvisionMachine(
 		identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Profile, provisionRequest.Libc, provisionRequest.Flavor)
 	if provisionError != nil {
 		log.Printf("%v: %v\n", clientIP(r), provisionError)

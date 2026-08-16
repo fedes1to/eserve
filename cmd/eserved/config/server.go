@@ -14,6 +14,7 @@ type ServerSettings struct {
 	BuildThreads   int    `json:"build_threads"`
 	PerUserThreads int    `json:"per_user_threads"`
 	ChrootBase     string `json:"chroot_base"`
+	StageBase      string `json:"stage_base"`
 	TlsCertPath    string `json:"tls_cert_path"`
 	TlsKeyPath     string `json:"tls_key_path"`
 }

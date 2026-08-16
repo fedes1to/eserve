@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
 
 func postCreateToken(w http.ResponseWriter, r *http.Request) {
-	token, tokenError := serverConfig.CreateToken()
+	token, tokenError := storage.CreateToken()
 
 	if tokenError != nil {
 		fmt.Fprintln(os.Stderr, "failed to create token,", tokenError)

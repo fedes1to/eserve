@@ -1,4 +1,4 @@
-package serverConfig
+package storage
 
 import (
 	"crypto/rand"
@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
@@ -23,7 +24,7 @@ type TokensFile struct {
 var (
 	tokens      TokensFile
 	tokensMutex sync.RWMutex
-	tokensPath  string = ServerConfigPath + "tokens.json"
+	tokensPath  string = serverConfig.ServerConfigPath + "tokens.json"
 )
 
 func LoadTokens() error {

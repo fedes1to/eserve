@@ -1,4 +1,4 @@
-package serverConfig
+package storage
 
 import (
 	"crypto/ed25519"
@@ -12,14 +12,16 @@ import (
 	"math/big"
 	"os"
 	"time"
+
+	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 )
 
 var (
 	CaCertificate     *x509.Certificate
 	CaKey             any
 	CaCertificatePEM  []byte
-	caCertificatePath string = ServerConfigPath + "ca.crt"
-	caKeyPath         string = ServerConfigPath + "ca.key"
+	caCertificatePath string = serverConfig.ServerConfigPath + "ca.crt"
+	caKeyPath         string = serverConfig.ServerConfigPath + "ca.key"
 	CaPool            *x509.CertPool
 )
 

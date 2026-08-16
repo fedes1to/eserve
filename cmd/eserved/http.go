@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
 
 const (
@@ -46,7 +47,7 @@ func requireClientCert(next http.Handler) http.Handler {
 
 		fingerprint := sha256.Sum256(peerCertificate.Raw)
 		fingerprintHex := hex.EncodeToString(fingerprint[:])
-		if !serverConfig.MachineCertValid(cn, fingerprintHex) {
+		if !storage.MachineCertValid(cn, fingerprintHex) {
 			log.Printf("%v Attempted request with invalid certificate\n", clientIP(r))
 			http.Error(w, "unknown or revoked machine", http.StatusUnauthorized)
 			return
@@ -84,8 +85,8 @@ func serveHTTP(admin bool) error {
 	}
 
 	tlsCfg := &tls.Config{
-		Certificates: []tls.Certificate{serverConfig.TlsCertificate},
-		ClientCAs:    serverConfig.CaPool,
+		Certificates: []tls.Certificate{storage.TlsCertificate},
+		ClientCAs:    storage.CaPool,
 		ClientAuth:   tls.VerifyClientCertIfGiven,
 		MinVersion:   tls.VersionTLS13,
 	}
