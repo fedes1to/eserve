@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/admin"
+	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
@@ -31,6 +32,34 @@ func parseTokenFlags() (error, int) {
 	return nil, 0
 }
 
+func parseStage() (error, int) {
+	if len(os.Args) < 3 {
+		cli.PrintUsage("epull stage", []cli.Command{
+			{Name: "download", Description: "Downloads a stage from the internet for eserved to use"},
+			{Name: "install", Description: "Installs a local stage for eserved to use"},
+		})
+		os.Exit(2)
+	}
+
+	switch os.Args[2] {
+	case "download":
+		url := flag.String("url", "", "url for the stagefile to download")
+		flag.Parse()
+		if *url == "" {
+			return fmt.Errorf("URL must be provided for download"), 2
+		}
+		storage.DownloadStage(*url)
+	case "install":
+		path := flag.String("path", "", "local path for the stagefile to install")
+		flag.Parse()
+		if installError := storage.InstallStage(*path); installError != nil {
+			return installError, 1
+		}
+	}
+
+	return nil, 0
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		cli.PrintUsage("epull", []cli.Command{
@@ -41,6 +70,11 @@ func main() {
 
 	switch os.Args[1] {
 	case "token":
+		if parseError, exitCode := parseTokenFlags(); parseError != nil {
+			fmt.Fprintln(os.Stderr, "Something went wrong,", parseError)
+			os.Exit(exitCode)
+		}
+	case "stage":
 		if parseError, exitCode := parseTokenFlags(); parseError != nil {
 			fmt.Fprintln(os.Stderr, "Something went wrong,", parseError)
 			os.Exit(exitCode)

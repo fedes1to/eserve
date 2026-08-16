@@ -23,5 +23,4 @@ func CreateToken() (string, error) {
 	}
 
 	return bodyString, nil
-
 }

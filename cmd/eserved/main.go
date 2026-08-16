@@ -21,6 +21,7 @@ func main() {
 
 	steps := []cli.InitStep{
 		{Name: "settings", Function: serverConfig.InitializeServerSettings},
+		{Name: "stage", Function: storage.InitializeStageFolder},
 		{Name: "sysinfo", Function: serverConfig.LoadServerSysinfo},
 		{Name: "ca certificate", Function: storage.LoadCaCertificate},
 		{Name: "tls certificate", Function: storage.LoadTlsCertificates},

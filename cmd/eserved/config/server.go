@@ -14,7 +14,7 @@ type ServerSettings struct {
 	BuildThreads   int    `json:"build_threads"`
 	PerUserThreads int    `json:"per_user_threads"`
 	ChrootBase     string `json:"chroot_base"`
-	StageBase      string `json:"stage_base"`
+	StagePath      string `json:"stage_base"`
 	TlsCertPath    string `json:"tls_cert_path"`
 	TlsKeyPath     string `json:"tls_key_path"`
 }
@@ -51,6 +51,7 @@ func InitializeServerSettings() error {
 			Settings.ListenAddr = "127.0.0.1:8080"
 			Settings.TlsCertPath = ServerConfigPath + "server.crt"
 			Settings.TlsKeyPath = ServerConfigPath + "server.key"
+			Settings.StagePath = ServerConfigPath + "stages/"
 			return config.SafeSaveJsonFile(serverSettingsPath, Settings)
 		}
 		return statError
