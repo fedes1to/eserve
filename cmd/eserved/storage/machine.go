@@ -5,17 +5,17 @@ import (
 	"path/filepath"
 	"sync"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 type MachineEntry struct {
-	Arch        string `json:"arch"`
-	Subarch     string `json:"march"`
-	Profile     string `json:"profile"`
-	Libc        string `json:"libc"`
-	Flavor      string `json:"flavor"`
-	Fingerprint string `json:"fingerprint"`
+	Arch        string         `json:"arch"`
+	Subarch     string         `json:"march"`
+	Profile     chroot.Profile `json:"profile"`
+	Flavor      string         `json:"flavor"`
+	Fingerprint string         `json:"fingerprint"`
 }
 
 // we still address by tokens here, thats the GUID we will use internally
@@ -59,7 +59,7 @@ func loadMachinesLocked() error {
 	return nil
 }
 
-func ProvisionMachine(cn, arch, subarch, profile, libc, flavor string) error {
+func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
@@ -68,15 +68,13 @@ func ProvisionMachine(cn, arch, subarch, profile, libc, flavor string) error {
 		return fmt.Errorf("machine %v has no certificate — run identity first", cn)
 	}
 
-	if arch != serverConfig.ServerArch {
-		return fmt.Errorf("Architecture mismatch, crossdev support not yet implemented")
+	if machines.Entries[cn].Profile.IsCrossdev() {
+		return fmt.Errorf("Crossdev support not implemented, choose same arch as eserved")
 	}
 
 	entry := MachineEntry{
-		Arch:        arch,
 		Subarch:     subarch,
-		Profile:     profile,
-		Libc:        libc,
+		Profile:     chroot.Profile{Full: profile, GccMachine: gccMachine},
 		Flavor:      flavor,
 		Fingerprint: upsertedEntry.Fingerprint,
 	}
@@ -88,11 +86,7 @@ func IsMachineCrossdev(cn string) bool {
 	machinesMutex.RLock()
 	defer machinesMutex.RUnlock()
 
-	if machines.Entries[cn].Arch != serverConfig.ServerArch {
-		return true
-	}
-
-	return false
+	return machines.Entries[cn].Profile.IsCrossdev()
 }
 
 func UpsertMachine(cn, fingerprint string) error {

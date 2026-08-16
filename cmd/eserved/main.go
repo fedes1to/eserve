@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
@@ -22,7 +23,7 @@ func main() {
 	steps := []cli.InitStep{
 		{Name: "settings", Function: serverConfig.InitializeServerSettings},
 		{Name: "stage", Function: storage.InitializeStageFolder},
-		{Name: "sysinfo", Function: serverConfig.LoadServerSysinfo},
+		{Name: "gcc info", Function: chroot.InitializeGccInfo},
 		{Name: "ca certificate", Function: storage.LoadCaCertificate},
 		{Name: "tls certificate", Function: storage.LoadTlsCertificates},
 		{Name: "tokens", Function: storage.LoadTokens},

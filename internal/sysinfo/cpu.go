@@ -6,20 +6,12 @@ import (
 	"strings"
 )
 
-func GetGccMachine() (string, string, error) {
+func GetGccMachine() (string, error) {
 	cmdOutput, cmdError := exec.Command("gcc", "-dumpmachine").Output()
 	if cmdError != nil {
-		return "", "", fmt.Errorf("Failed to execute gcc, %w", cmdError)
+		return "", fmt.Errorf("Failed to execute gcc, %w", cmdError)
 	}
-
-	parts := strings.Split(strings.TrimSpace(string(cmdOutput)), "-")
-	if len(parts) < 2 {
-		return "", "", fmt.Errorf("unexpected gcc -dumpmachine output: %q", string(cmdOutput))
-	}
-
-	arch := parts[0]
-	libc := parts[len(parts)-1]
-	return arch, libc, nil
+	return strings.TrimSpace(string(cmdOutput)), nil
 }
 
 func getGccMarch() (string, error) {
@@ -44,6 +36,5 @@ func GetCpuSubarch() (string, error) {
 	if portageMarch != "" {
 		return portageMarch, nil
 	}
-
 	return getGccMarch()
 }

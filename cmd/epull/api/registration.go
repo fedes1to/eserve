@@ -144,9 +144,9 @@ func postProvisioning(flavor string) error {
 		return subarchError
 	}
 
-	cpuChost, libc, chostError := sysinfo.GetGccMachine()
-	if chostError != nil {
-		return chostError
+	gccMachine, machineError := sysinfo.GetGccMachine()
+	if machineError != nil {
+		return machineError
 	}
 
 	profile, profileError := sysinfo.GetPortageProfile()
@@ -154,10 +154,10 @@ func postProvisioning(flavor string) error {
 		return profileError
 	}
 
-	log.Printf("Found arch %v with subarch %v\n", cpuChost, cpuSubarch)
+	log.Printf("Found profile %v with subarch %v\n", profile, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{Arch: cpuChost, Subarch: cpuSubarch, Profile: profile, Flavor: flavor, Libc: libc}
+	payload := protocol.ProvisionRequest{Subarch: cpuSubarch, GccMachine: gccMachine, Profile: profile, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
 	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if requestError != nil {

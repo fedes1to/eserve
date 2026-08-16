@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"git.fedesito.me/fedes1to/eserve/internal/config"
-	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
 
 type ServerSettings struct {
@@ -24,18 +23,7 @@ var (
 	Settings           ServerSettings // i cant come up with a better naming system
 	ServerConfigPath   string         = config.InitConfigPath(config.ServerConfigPath)
 	serverSettingsPath string         = filepath.Join(ServerConfigPath, "settings.json")
-	ServerArch         string
-	ServerLibc         string
 )
-
-func LoadServerSysinfo() error {
-	arch, libc, gccError := sysinfo.GetGccMachine()
-	if gccError != nil {
-		return gccError
-	}
-	ServerArch, ServerLibc = arch, libc
-	return nil
-}
 
 // populates global var Server
 func LoadServerSettings() error {

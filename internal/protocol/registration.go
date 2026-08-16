@@ -11,11 +11,11 @@ type IdentificationResponse struct {
 }
 
 type ProvisionRequest struct {
-	Arch    string `json:"arch"`
-	Subarch string `json:"sub_arch"`
-	Profile string `json:"profile"`
-	Libc    string `json:"libc"`
-	Flavor  string `json:"flavor"`
+	GccMachine string `json:"gcc_machine"`
+	Subarch    string `json:"sub_arch"`
+	Profile    string `json:"profile"`
+	Libc       string `json:"libc"`
+	Flavor     string `json:"flavor"`
 }
 
 type ProvisionResponse struct {
