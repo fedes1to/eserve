@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/download"
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
@@ -35,7 +36,7 @@ func GetStageHash(filename string) (string, error) {
 		return "", pathError
 	}
 
-	return hashFileSHA256(stagePath + filename)
+	return hashFileSHA256(stagePath + "/" + filename)
 
 }
 
@@ -59,7 +60,7 @@ func InstallStage(path string) error {
 	if pathError != nil {
 		return pathError
 	}
-	destinationFile, createError := os.Create(stagePath + sourceFile.Name())
+	destinationFile, createError := os.Create(stagePath + "/" + filepath.Base(path))
 	if createError != nil {
 		return createError
 	}
