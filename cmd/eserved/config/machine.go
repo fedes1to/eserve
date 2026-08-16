@@ -10,6 +10,7 @@ import (
 type MachineEntry struct {
 	Arch        string `json:"arch"`
 	Subarch     string `json:"march"`
+	Profile     string `json:"profile"`
 	Libc        string `json:"libc"`
 	Flavor      string `json:"flavor"`
 	Fingerprint string `json:"fingerprint"`
@@ -56,19 +57,26 @@ func loadMachinesLocked() error {
 	return nil
 }
 
-func ProvisionMachine(cn, arch, subarch, libc, flavor string) error {
+func ProvisionMachine(cn, arch, subarch, profile, libc, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
+
+	upsertedEntry, exists := machines.Entries[cn]
+	if !exists || upsertedEntry.Fingerprint == "" {
+		return fmt.Errorf("machine %v has no certificate — run identity first", cn)
+	}
 
 	if arch != ServerArch {
 		return fmt.Errorf("Architecture mismatch, crossdev support not yet implemented")
 	}
 
 	entry := MachineEntry{
-		Arch:    arch,
-		Subarch: subarch,
-		Libc:    libc,
-		Flavor:  flavor,
+		Arch:        arch,
+		Subarch:     subarch,
+		Profile:     profile,
+		Libc:        libc,
+		Flavor:      flavor,
+		Fingerprint: upsertedEntry.Fingerprint,
 	}
 	machines.Entries[cn] = entry
 	return saveMachinesLocked()

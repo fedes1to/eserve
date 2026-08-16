@@ -100,7 +100,7 @@ func postProvision(w http.ResponseWriter, r *http.Request) {
 
 	identity := r.Context().Value(ctxKeyIdentity).(ClientIdentity)
 	provisionError := serverConfig.ProvisionMachine(
-		identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Libc, provisionRequest.Flavor)
+		identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Profile, provisionRequest.Libc, provisionRequest.Flavor)
 	if provisionError != nil {
 		log.Printf("%v: %v\n", clientIP(r), provisionError)
 		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)

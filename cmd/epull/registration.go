@@ -49,7 +49,7 @@ func initializeMtlsClient(insecure bool) error {
 	return nil
 }
 
-func handleIdentification(token string, server string, insecure bool) error {
+func postIdentification(token string, server string, insecure bool) error {
 	// making the certs and CSR
 	_, privKey, keyError := ed25519.GenerateKey(rand.Reader)
 	if keyError != nil {
@@ -163,7 +163,7 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 	return sendRequest(request, into, mtlsClient)
 }
 
-func handleProvisioning(flavor string) error {
+func postProvisioning(flavor string) error {
 	// Provisioning
 	cpuSubarch, subarchError := sysinfo.GetCpuSubarch()
 	if subarchError != nil {
@@ -175,10 +175,15 @@ func handleProvisioning(flavor string) error {
 		return chostError
 	}
 
+	profile, profileError := sysinfo.GetPortageProfile()
+	if profileError != nil {
+		return profileError
+	}
+
 	log.Printf("Found arch %v with subarch %v\n", cpuChost, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{Arch: cpuChost, Subarch: cpuSubarch, Flavor: flavor, Libc: libc}
+	payload := protocol.ProvisionRequest{Arch: cpuChost, Subarch: cpuSubarch, Profile: profile, Flavor: flavor, Libc: libc}
 	var provisionResponse protocol.ProvisionResponse
 	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if requestError != nil {
@@ -188,13 +193,21 @@ func handleProvisioning(flavor string) error {
 	return nil
 }
 
+func handleProvision(flavor string) (error, int) {
+	log.Printf("Provisioning with flavor %v", flavor)
+
+	return macros.MustRegister([]macros.InitStep{
+		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
+	})
+}
+
 func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
 	return macros.MustRegister([]macros.InitStep{
-		{Name: "identity", Function: func() error { return handleIdentification(token, server, insecure) }},
+		{Name: "identity", Function: func() error { return postIdentification(token, server, insecure) }},
 		{Name: "mtls client", Function: func() error { return initializeMtlsClient(insecure) }},
-		{Name: "provisioning", Function: func() error { return handleProvisioning(flavor) }},
+		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
 	})
 
 }
