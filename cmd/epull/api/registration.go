@@ -141,7 +141,7 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 	return sendRequest(request, into, mtlsClient)
 }
 
-func postProvisioning(flavor string) error {
+func postProvisioning(flavor, stage string) error {
 	// Provisioning
 	cpuSubarch, err := sysinfo.GetCpuSubarch()
 	if err != nil {
@@ -161,7 +161,7 @@ func postProvisioning(flavor string) error {
 	log.Printf("Found profile %v with subarch %v\n", profile, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{Subarch: cpuSubarch, GccMachine: gccMachine, Profile: profile, Flavor: flavor}
+	payload := protocol.ProvisionRequest{GccMachine: gccMachine, Subarch: cpuSubarch, Profile: profile, Stagefile: stage, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
 	err = sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
 	if err != nil {
@@ -171,21 +171,30 @@ func postProvisioning(flavor string) error {
 	return nil
 }
 
-func HandleProvision(flavor string) (error, int) {
+func HandleProvision(flavor, stage string) (error, int) {
 	log.Printf("Provisioning with flavor %v", flavor)
 
 	return cli.MustRegister([]cli.InitStep{
-		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
+		{Name: "provisioning", Function: func() error { return postProvisioning(flavor, stage) }},
 	})
 }
 
-func HandleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
+func HandleRegistration(token, server, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
-	return cli.MustRegister([]cli.InitStep{
+	err, exitCode := cli.MustRegister([]cli.InitStep{
 		{Name: "identity", Function: func() error { return postIdentification(token, server, insecure) }},
 		{Name: "mtls client", Function: func() error { return InitializeMtlsClient(insecure) }},
-		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
 	})
+	if err != nil {
+		return err, exitCode
+	}
+
+	stage, err := AskStagefile()
+	if err != nil {
+		return err, 1
+	}
+	return cli.MustRegister([]cli.InitStep{
+		{Name: "provision", Function: func() error { return postProvisioning(flavor, stage) }}})
 
 }

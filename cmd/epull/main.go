@@ -34,7 +34,16 @@ func parseProvision() (error, int) {
 	fs := flag.NewFlagSet("provision", flag.ExitOnError)
 	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
 	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
+	stage := fs.String("stage", "", "Stage3 file used on provisioning")
 	fs.Parse(os.Args[2:])
+
+	if *stage == "" {
+		var err error
+		*stage, err = api.AskStagefile()
+		if err != nil {
+			return err, 1
+		}
+	}
 
 	if err := clientConfig.LoadClientSettings(); err != nil {
 		return err, 1
@@ -43,7 +52,7 @@ func parseProvision() (error, int) {
 		return err, 1
 	}
 
-	return api.HandleProvision(*flavor)
+	return api.HandleProvision(*flavor, *stage)
 }
 
 func main() {
