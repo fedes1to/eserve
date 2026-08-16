@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/api"
-	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 

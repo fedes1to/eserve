@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 	"time"
 
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 )
 
 var (

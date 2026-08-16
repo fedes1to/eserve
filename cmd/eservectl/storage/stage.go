@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/download"
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/internal/sharedStorage"
 )
 
 // https://transloadit.com/devtips/verify-file-integrity-with-go-and-sha256/
@@ -31,7 +31,7 @@ func hashFileSHA256(filePath string) (string, error) {
 }
 
 func GetStageHash(filename string) (string, error) {
-	stagePath, pathError := GetStagePath()
+	stagePath, pathError := sharedStorage.GetStagePath()
 	if pathError != nil {
 		return "", pathError
 	}
@@ -41,7 +41,7 @@ func GetStageHash(filename string) (string, error) {
 }
 
 func DownloadStage(url string) (string, error) {
-	stagePath, pathError := GetStagePath()
+	stagePath, pathError := sharedStorage.GetStagePath()
 	if pathError != nil {
 		return "", pathError
 	}
@@ -56,7 +56,7 @@ func InstallStage(path string) error {
 	}
 	defer sourceFile.Close()
 
-	stagePath, pathError := GetStagePath()
+	stagePath, pathError := sharedStorage.GetStagePath()
 	if pathError != nil {
 		return pathError
 	}
@@ -72,15 +72,4 @@ func InstallStage(path string) error {
 	}
 
 	return nil
-}
-
-func GetStagePath() (string, error) {
-	if serverConfig.Settings.StagePath == "" {
-		loadError := serverConfig.LoadServerSettings()
-		if loadError != nil {
-			return "", loadError
-		}
-	}
-
-	return serverConfig.Settings.StagePath, nil
 }

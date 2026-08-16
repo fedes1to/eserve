@@ -13,7 +13,7 @@ import (
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
 

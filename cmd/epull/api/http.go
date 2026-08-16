@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"net/http"
 
-	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 )
 
 var mtlsClient *http.Client

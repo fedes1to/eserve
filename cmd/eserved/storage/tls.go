@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 )
 
 var TlsCertificate tls.Certificate

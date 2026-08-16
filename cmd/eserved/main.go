@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
-	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
@@ -29,7 +29,6 @@ func main() {
 		{Name: "tokens", Function: storage.LoadTokens},
 		{Name: "machines", Function: storage.LoadMachines},
 	}
-
 	cli.MustInit(steps)
 
 	parseArgs()

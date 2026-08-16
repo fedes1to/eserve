@@ -17,7 +17,7 @@ import (
 	"path/filepath"
 	"time"
 
-	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
