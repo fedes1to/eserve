@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"log"
 )
 
 type InitStep struct {
@@ -10,12 +9,13 @@ type InitStep struct {
 	Function func() error
 }
 
-func MustInit(steps []InitStep) {
+func MustInit(steps []InitStep) error {
 	for _, step := range steps {
 		if err := step.Function(); err != nil {
-			log.Fatalf("failed %s: %v", step.Name, err)
+			return fmt.Errorf("failed %s: %w", step.Name, err)
 		}
 	}
+	return nil
 }
 
 func MustRegister(steps []InitStep) (error, int) {

@@ -11,16 +11,16 @@ func GetStageList() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := os.Open(stagePath)
+	dir, err := os.Open(stagePath)
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
-	fns, err := f.Readdirnames(-1)
+	defer dir.Close()
+	filenames, err := dir.Readdirnames(-1)
 	if err != nil {
 		return nil, err
 	}
-	return fns, nil
+	return filenames, nil
 }
 
 func GetStagePath() (string, error) {

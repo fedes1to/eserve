@@ -11,13 +11,14 @@ import (
 )
 
 func parseRegister() (error, int) {
+	fs := flag.NewFlagSet("register", flag.ExitOnError)
 	// registration
-	token := flag.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
-	server := flag.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
-	flavor := flag.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
-	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
+	token := fs.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
+	server := fs.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
+	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
+	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 
-	flag.Parse()
+	fs.Parse(os.Args[2:])
 
 	if *token == "" || *server == "" {
 		return fmt.Errorf("Register requires a token and server"), 2
@@ -30,9 +31,14 @@ func parseRegister() (error, int) {
 }
 
 func parseProvision() (error, int) {
-	flavor := flag.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
-	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
-	flag.Parse()
+	fs := flag.NewFlagSet("provision", flag.ExitOnError)
+	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
+	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
+	fs.Parse(os.Args[2:])
+
+	if err := clientConfig.LoadClientSettings(); err != nil {
+		return err, 1
+	}
 	if err := api.InitializeMtlsClient(*insecure); err != nil {
 		return err, 1
 	}
@@ -46,11 +52,6 @@ func main() {
 			{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
 		})
 		os.Exit(2)
-	}
-
-	if err := clientConfig.LoadClientSettings(); err != nil {
-		fmt.Fprintln(os.Stderr, "Fail to load settings,", err)
-		os.Exit(1)
 	}
 
 	switch os.Args[1] {

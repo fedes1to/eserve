@@ -2,34 +2,24 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
-
-	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
-	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
-	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
-	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"os"
 )
 
-func parseArgs() {
-	admin := flag.Bool("admin", true, "allow eservectl endpoint, defaults to true")
-	flag.Parse()
+func parseArgs() error {
+	fs := flag.NewFlagSet("eserved", flag.ExitOnError)
+	admin := fs.Bool("admin", true, "allow eservectl endpoint, defaults to true")
+	fs.Parse(os.Args[1:])
 
-	serveHTTP(*admin)
+	return serveHTTP(*admin)
 }
 
 func main() {
 	log.Println("Starting eserved...")
 
-	steps := []cli.InitStep{
-		{Name: "settings", Function: serverConfig.InitializeServerSettings},
-		{Name: "stage", Function: storage.InitializeStageFolder},
-		{Name: "gcc info", Function: chroot.InitializeGccInfo},
-		{Name: "ca certificate", Function: storage.LoadCaCertificate},
-		{Name: "tls certificate", Function: storage.LoadTlsCertificates},
-		{Name: "tokens", Function: storage.LoadTokens},
-		{Name: "machines", Function: storage.LoadMachines},
+	if err := parseArgs(); err != nil {
+		fmt.Fprintln(os.Stderr, "Something went wrong,", err)
+		os.Exit(1)
 	}
-	cli.MustInit(steps)
-
-	parseArgs()
 }

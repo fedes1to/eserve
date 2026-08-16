@@ -8,47 +8,80 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strconv"
 	"time"
 )
 
-// https://gist.github.com/albulescu/e61979cc852e4ee8f49c
+// https://gist.github.com/albulescu/e61979cc852e4ee8f49c but better
+
+func humanBytes(n int64) string {
+	const unit = 1024
+	if n < unit {
+		return fmt.Sprintf("%d B", n)
+	}
+	div, exp := int64(unit), 0
+	for m := n / unit; m >= unit; m /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
+}
 
 func PrintDownloadPercent(done chan int64, path string, total int64) {
-	var stop bool = false
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
+
+	prevSize, prevTime, speed := int64(0), time.Now(), 0.0
+
+	// renders one line in place via \r; called every tick and once more on done
+	render := func() {
+		fi, err := file.Stat()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		size, now := fi.Size(), time.Now()
+
+		// bytes since last tick -> speed
+		if dt := now.Sub(prevTime).Seconds(); dt > 0 && size >= prevSize {
+			speed = float64(size-prevSize) / dt
+		}
+		prevSize, prevTime = size, now
+
+		var eta string
+		if speed > 0 {
+			eta = (time.Duration(float64(total-size)/speed) * time.Second).Round(time.Second).String()
+		} else {
+			eta = "-"
+		}
+
+		var percent string
+		if total > 0 {
+			percent = fmt.Sprintf("%.0f%%", float64(size)/float64(total)*100)
+		} else {
+			percent = "?"
+		}
+
+		fmt.Printf("\r%s  %s / %s  %.1f MiB/s  ETA %s",
+			percent, humanBytes(size), humanBytes(total), speed/(1024*1024), eta)
+	}
+
 	for {
 		select {
 		case <-done:
-			stop = true
+			render()
+			fmt.Println()
+			return
 		default:
-			fi, err := file.Stat()
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			size := fi.Size()
-			if size == 0 {
-				size = 1
-			}
-
-			var percent float64 = float64(size) / float64(total) * 100
-			fmt.Printf("%.0f", percent)
-			fmt.Println("%")
-		}
-
-		if stop {
-			break
+			render()
 		}
 		time.Sleep(time.Second)
 	}
 }
 
-func DownloadFile(url string, dest string) string {
+func DownloadFile(url string, dest string) (string, error) {
 	file := path.Base(url)
 	log.Printf("Downloading file %s from %s\n", file, url)
 
@@ -56,36 +89,31 @@ func DownloadFile(url string, dest string) string {
 	start := time.Now()
 	out, err := os.Create(fullPath)
 	if err != nil {
-		fmt.Println(fullPath)
-		panic(err)
+		return "", err
 	}
 	defer out.Close()
 
-	headResp, err := http.Head(url)
-	if err != nil {
-		panic(err)
+	// avoid panic here from -1 total (from server header)
+	total := int64(0)
+	if resp, err := http.Head(url); err == nil {
+		total = resp.ContentLength
 	}
-	defer headResp.Body.Close()
 
-	size, err := strconv.Atoi(headResp.Header.Get("Content-Length"))
-	if err != nil {
-		panic(err)
-	}
 	done := make(chan int64)
+	go PrintDownloadPercent(done, fullPath, total)
 
-	go PrintDownloadPercent(done, fullPath, int64(size))
 	resp, err := http.Get(url)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	defer resp.Body.Close()
 	n, err := io.Copy(out, resp.Body)
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 
 	done <- n
 	elapsed := time.Since(start)
 	log.Printf("Download completed in %s", elapsed)
-	return file
+	return file, nil
 }

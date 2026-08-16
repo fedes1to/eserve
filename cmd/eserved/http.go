@@ -13,8 +13,10 @@ import (
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
 func requireClientCert(next http.Handler) http.Handler {
@@ -45,6 +47,19 @@ func requireClientCert(next http.Handler) http.Handler {
 }
 
 func serveHTTP(adminEnabled bool) error {
+	steps := []cli.InitStep{
+		{Name: "settings", Function: serverConfig.InitializeServerSettings},
+		{Name: "stage", Function: storage.InitializeStageFolder},
+		{Name: "gcc info", Function: chroot.InitializeGccInfo},
+		{Name: "ca certificate", Function: storage.LoadCaCertificate},
+		{Name: "tls certificate", Function: storage.LoadTlsCertificates},
+		{Name: "tokens", Function: storage.LoadTokens},
+		{Name: "machines", Function: storage.LoadMachines},
+	}
+	if err := cli.MustInit(steps); err != nil {
+		return err
+	}
+
 	if adminEnabled {
 		adminMux := http.NewServeMux()
 		adminMux.HandleFunc("/admin/v1/create_token", admin.PostCreateToken)
@@ -75,6 +90,7 @@ func serveHTTP(adminEnabled bool) error {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("/api/v1/identity", api.PostIdentity)
 	apiMux.Handle("/api/v1/provision", requireClientCert(http.HandlerFunc(api.PostProvision)))
+	apiMux.Handle("/api/v1/stages", requireClientCert(http.HandlerFunc(api.GetStages)))
 
 	apiServer := &http.Server{
 		Addr:      serverConfig.Settings.ListenAddr,

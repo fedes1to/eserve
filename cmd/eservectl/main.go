@@ -9,11 +9,13 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/sharedStorage"
 )
 
 func parseTokenFlags() (error, int) {
-	create := flag.Bool("create", false, "requests a token to be created on eserved")
-	flag.Parse()
+	fs := flag.NewFlagSet("token", flag.ExitOnError)
+	create := fs.Bool("create", false, "requests a token to be created on eserved")
+	fs.Parse(os.Args[2:])
 
 	err := admin.TryConnect()
 	if err != nil {
@@ -21,7 +23,7 @@ func parseTokenFlags() (error, int) {
 	}
 
 	if *create {
-		token, err := admin.CreateToken()
+		token, err := admin.PostCreateToken()
 		if err != nil {
 			return fmt.Errorf("Couldn't create token, %w", err), 1
 		}
@@ -37,14 +39,16 @@ func parseStage() (error, int) {
 		cli.PrintUsage("epull stage", []cli.Command{
 			{Name: "download", Description: "Downloads a stage from the internet for eserved to use"},
 			{Name: "install", Description: "Installs a local stage for eserved to use"},
+			{Name: "list", Description: "Lists downloaded stages"},
 		})
 		os.Exit(2)
 	}
 
 	switch os.Args[2] {
 	case "download":
-		url := flag.String("url", "", "url for the stagefile to download")
-		flag.Parse()
+		fs := flag.NewFlagSet("stage download", flag.ExitOnError)
+		url := fs.String("url", "", "url for the stagefile to download")
+		fs.Parse(os.Args[3:])
 		if *url == "" {
 			return fmt.Errorf("URL must be provided for download"), 2
 		}
@@ -59,10 +63,19 @@ func parseStage() (error, int) {
 		log.Printf("sha256sum of %v: %v", fileName, sha256sum)
 
 	case "install":
-		path := flag.String("path", "", "local path for the stagefile to install")
-		flag.Parse()
+		fs := flag.NewFlagSet("stage install", flag.ExitOnError)
+		path := fs.String("path", "", "local path for the stagefile to install")
+		fs.Parse(os.Args[3:])
 		if err := storage.InstallStage(*path); err != nil {
 			return err, 1
+		}
+	case "list":
+		stageList, err := sharedStorage.GetStageList()
+		if err != nil {
+			return fmt.Errorf("Couldn't list stages, %w", err), 1
+		}
+		for _, stage := range stageList {
+			fmt.Println(stage)
 		}
 	}
 
@@ -72,7 +85,8 @@ func parseStage() (error, int) {
 func main() {
 	if len(os.Args) < 2 {
 		cli.PrintUsage("epull", []cli.Command{
-			{Name: "token", Description: "Generate a token used for registration"},
+			{Name: "token", Description: "Manage tokens used for registration"},
+			{Name: "stage", Description: "Manage stage3 files"},
 		})
 		os.Exit(2)
 	}

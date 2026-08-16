@@ -46,7 +46,12 @@ func DownloadStage(url string) (string, error) {
 		return "", err
 	}
 
-	return download.DownloadFile(stagePath, url), nil
+	fileName, err := download.DownloadFile(url, stagePath)
+	if err != nil {
+		return "", err
+	}
+
+	return fileName, nil
 }
 
 func InstallStage(path string) error {

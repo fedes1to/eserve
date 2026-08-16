@@ -12,9 +12,9 @@ type IdentificationResponse struct {
 
 type ProvisionRequest struct {
 	GccMachine string `json:"gcc_machine"`
-	Subarch    string `json:"sub_arch"`
+	Subarch    string `json:"subarch"`
 	Profile    string `json:"profile"`
-	Libc       string `json:"libc"`
+	Stagefile  string `json:"stagefile"`
 	Flavor     string `json:"flavor"`
 }
 

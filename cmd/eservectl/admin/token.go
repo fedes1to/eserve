@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-func CreateToken() (string, error) {
+func PostCreateToken() (string, error) {
 	response, err := adminClient.Post("http://unix/admin/v1/create_token", "", nil)
 	if err != nil {
 		return "", err

@@ -15,7 +15,7 @@ func InitConfigPath(path string) string {
 	info, err := os.Stat(path)
 	if err != nil {
 		// maybe /etc/ doesn't exist (x doubt)? so we use MkdirAll
-		if os.MkdirAll(path, 0644) != nil {
+		if os.MkdirAll(path, 0755) != nil {
 			log.Fatalln("Can't create config folder, is the process root?")
 		}
 	} else if !info.IsDir() {
