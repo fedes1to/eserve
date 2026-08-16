@@ -20,8 +20,8 @@ var (
 	CaCertificate     *x509.Certificate
 	CaKey             any
 	CaCertificatePEM  []byte
-	caCertificatePath string = serverConfig.ServerConfigPath + "ca.crt"
-	caKeyPath         string = serverConfig.ServerConfigPath + "ca.key"
+	caCertificatePath string = serverConfig.ServerConfigPath + "/ca.crt"
+	caKeyPath         string = serverConfig.ServerConfigPath + "/ca.key"
 	CaPool            *x509.CertPool
 )
 

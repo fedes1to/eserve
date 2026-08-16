@@ -7,8 +7,8 @@ import (
 
 // hardcoding go brrr i guess
 const (
-	ServerConfigPath = "/etc/eserved/"
-	ClientConfigPath = "/etc/epull/"
+	ServerConfigPath = "/etc/eserved"
+	ClientConfigPath = "/etc/epull"
 )
 
 func InitConfigPath(path string) string {

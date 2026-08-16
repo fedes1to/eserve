@@ -29,6 +29,16 @@ func hashFileSHA256(filePath string) (string, error) {
 	return hex.EncodeToString(hashInBytes[:]), nil
 }
 
+func GetStageHash(filename string) (string, error) {
+	stagePath, pathError := GetStagePath()
+	if pathError != nil {
+		return "", pathError
+	}
+
+	return hashFileSHA256(stagePath + filename)
+
+}
+
 func DownloadStage(url string) (string, error) {
 	stagePath, pathError := GetStagePath()
 	if pathError != nil {
@@ -64,8 +74,11 @@ func InstallStage(path string) error {
 }
 
 func GetStagePath() (string, error) {
-	if loadError := serverConfig.LoadServerSettings(); loadError != nil {
-		return "", loadError
+	if serverConfig.Settings.StagePath == "" {
+		loadError := serverConfig.LoadServerSettings()
+		if loadError != nil {
+			return "", loadError
+		}
 	}
 
 	return serverConfig.Settings.StagePath, nil

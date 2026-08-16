@@ -25,7 +25,7 @@ type MachinesFile struct {
 var (
 	machines      MachinesFile
 	machinesMutex sync.RWMutex
-	machinesPath  = serverConfig.ServerConfigPath + "machines.json"
+	machinesPath  = serverConfig.ServerConfigPath + "/machines.json"
 )
 
 func LoadMachines() error {

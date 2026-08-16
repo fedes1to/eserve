@@ -22,7 +22,7 @@ type ServerSettings struct {
 var (
 	Settings           ServerSettings // i cant come up with a better naming system
 	ServerConfigPath   string         = config.InitConfigPath(config.ServerConfigPath)
-	serverSettingsPath string         = ServerConfigPath + "settings.json"
+	serverSettingsPath string         = ServerConfigPath + "/settings.json"
 	ServerArch         string
 	ServerLibc         string
 )
@@ -47,11 +47,11 @@ func InitializeServerSettings() error {
 			log.Println("Generating default server config")
 			Settings.BuildThreads = 0
 			Settings.PerUserThreads = 0
-			Settings.ChrootBase = "/srv/build/"
+			Settings.ChrootBase = "/srv/build"
 			Settings.ListenAddr = "127.0.0.1:8080"
-			Settings.TlsCertPath = ServerConfigPath + "server.crt"
-			Settings.TlsKeyPath = ServerConfigPath + "server.key"
-			Settings.StagePath = ServerConfigPath + "stages/"
+			Settings.TlsCertPath = ServerConfigPath + "/server.crt"
+			Settings.TlsKeyPath = ServerConfigPath + "/server.key"
+			Settings.StagePath = ServerConfigPath + "/stages"
 			return config.SafeSaveJsonFile(serverSettingsPath, Settings)
 		}
 		return statError

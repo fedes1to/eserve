@@ -48,7 +48,16 @@ func parseStage() (error, int) {
 		if *url == "" {
 			return fmt.Errorf("URL must be provided for download"), 2
 		}
-		storage.DownloadStage(*url)
+		fileName, downloadError := storage.DownloadStage(*url)
+		if downloadError != nil {
+			return downloadError, 1
+		}
+		sha256sum, shaError := storage.GetStageHash(fileName)
+		if shaError != nil {
+			return fmt.Errorf("Download succeeded but couldn't get SHA256 hash, %w", shaError), 1
+		}
+		log.Printf("sha256sum of %v: %v", fileName, sha256sum)
+
 	case "install":
 		path := flag.String("path", "", "local path for the stagefile to install")
 		flag.Parse()

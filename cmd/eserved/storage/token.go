@@ -24,7 +24,7 @@ type TokensFile struct {
 var (
 	tokens      TokensFile
 	tokensMutex sync.RWMutex
-	tokensPath  string = serverConfig.ServerConfigPath + "tokens.json"
+	tokensPath  string = serverConfig.ServerConfigPath + "/tokens.json"
 )
 
 func LoadTokens() error {
