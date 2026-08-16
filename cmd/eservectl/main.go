@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/admin"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
 
@@ -13,13 +14,13 @@ func parseTokenFlags() (error, int) {
 	create := flag.Bool("create", false, "requests a token to be created on eserved")
 	flag.Parse()
 
-	connectError := tryConnect()
+	connectError := admin.TryConnect()
 	if connectError != nil {
 		return fmt.Errorf("Can't connect, %w", connectError), 0
 	}
 
 	if *create {
-		token, createError := createToken()
+		token, createError := admin.CreateToken()
 		if createError != nil {
 			return fmt.Errorf("Couldn't create token, %w", createError), 1
 		}

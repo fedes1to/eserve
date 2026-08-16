@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/api"
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 )
@@ -25,18 +26,18 @@ func parseRegister() (error, int) {
 	if *flavor == "" {
 		*flavor, _ = os.Hostname()
 	}
-	return handleRegistration(*token, *server, *flavor, *insecure)
+	return api.HandleRegistration(*token, *server, *flavor, *insecure)
 }
 
 func parseProvision() (error, int) {
 	flavor := flag.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
 	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 	flag.Parse()
-	if initError := initializeMtlsClient(*insecure); initError != nil {
+	if initError := api.InitializeMtlsClient(*insecure); initError != nil {
 		return initError, 1
 	}
 
-	return handleProvision(*flavor)
+	return api.HandleProvision(*flavor)
 }
 
 func main() {

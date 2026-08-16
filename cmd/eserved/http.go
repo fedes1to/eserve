@@ -10,31 +10,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
-
-const (
-	socketPath     = "/run/eserved.sock"
-	ctxKeyIdentity = "client_identity"
-)
-
-type ClientIdentity struct {
-	CN          string
-	Fingerprint string
-}
-
-func clientIP(r *http.Request) string {
-	proxyIpHeader := r.Header.Get("X-Forwarded-For")
-
-	if proxyIpHeader == "" {
-		return r.RemoteAddr
-	}
-
-	return strings.Split(proxyIpHeader, ",")[0] + " (via " + r.RemoteAddr + ")"
-}
 
 func requireClientCert(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -48,33 +29,33 @@ func requireClientCert(next http.Handler) http.Handler {
 		fingerprint := sha256.Sum256(peerCertificate.Raw)
 		fingerprintHex := hex.EncodeToString(fingerprint[:])
 		if !storage.MachineCertValid(cn, fingerprintHex) {
-			log.Printf("%v Attempted request with invalid certificate\n", clientIP(r))
+			log.Printf("%v Attempted request with invalid certificate\n", api.ClientIP(r))
 			http.Error(w, "unknown or revoked machine", http.StatusUnauthorized)
 			return
 		}
 
-		identity := ClientIdentity{
+		identity := api.ClientIdentity{
 			CN:          peerCertificate.Subject.CommonName,
 			Fingerprint: fingerprintHex,
 		}
 
-		ctx := context.WithValue(r.Context(), ctxKeyIdentity, identity)
+		ctx := context.WithValue(r.Context(), api.CtxKeyIdentity, identity)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func serveHTTP(admin bool) error {
-	if admin {
+func serveHTTP(adminEnabled bool) error {
+	if adminEnabled {
 		adminMux := http.NewServeMux()
-		adminMux.HandleFunc("/admin/v1/create_token", postCreateToken)
+		adminMux.HandleFunc("/admin/v1/create_token", admin.PostCreateToken)
 
-		os.Remove(socketPath)
-		unixSocket, listenError := net.Listen("unix", socketPath)
+		os.Remove(admin.SocketPath)
+		unixSocket, listenError := net.Listen("unix", admin.SocketPath)
 		if listenError != nil {
 			return listenError
 		}
 		defer unixSocket.Close()
-		os.Chmod(socketPath, 0600)
+		os.Chmod(admin.SocketPath, 0600)
 		adminServer := &http.Server{Handler: adminMux}
 
 		go func() {
@@ -92,10 +73,10 @@ func serveHTTP(admin bool) error {
 	}
 
 	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("/api/v1/provision", postProvision)
+	apiMux.HandleFunc("/api/v1/provision", api.PostProvision)
 
 	outerMux := http.NewServeMux()
-	outerMux.HandleFunc("/api/v1/identity", postIdentity) // specifically here we dont mTLS
+	outerMux.HandleFunc("/api/v1/identity", api.PostIdentity) // specifically here we dont mTLS
 	outerMux.Handle("/", requireClientCert(apiMux))
 
 	apiServer := &http.Server{

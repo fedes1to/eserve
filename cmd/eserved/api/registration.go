@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"crypto/rand"
@@ -17,10 +17,10 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
-func postIdentity(w http.ResponseWriter, r *http.Request) {
+func PostIdentity(w http.ResponseWriter, r *http.Request) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if !storage.IsTokenAvailable(token) {
-		log.Printf("%v Attempted identification with invalid token\n", clientIP(r))
+		log.Printf("%v Attempted identification with invalid token\n", ClientIP(r))
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
@@ -90,7 +90,7 @@ func postIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func postProvision(w http.ResponseWriter, r *http.Request) {
+func PostProvision(w http.ResponseWriter, r *http.Request) {
 	var provisionRequest protocol.ProvisionRequest
 	decodeError := json.NewDecoder(r.Body).Decode(&provisionRequest)
 	if decodeError != nil {
@@ -98,11 +98,11 @@ func postProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	identity := r.Context().Value(ctxKeyIdentity).(ClientIdentity)
+	identity := r.Context().Value(CtxKeyIdentity).(ClientIdentity)
 	provisionError := storage.ProvisionMachine(
 		identity.CN, provisionRequest.Arch, provisionRequest.Subarch, provisionRequest.Profile, provisionRequest.Libc, provisionRequest.Flavor)
 	if provisionError != nil {
-		log.Printf("%v: %v\n", clientIP(r), provisionError)
+		log.Printf("%v: %v\n", ClientIP(r), provisionError)
 		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)
 		return
 	}

@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -21,33 +21,6 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
 )
-
-var mtlsClient *http.Client
-
-// config must be populated to call this method
-func initializeMtlsClient(insecure bool) error {
-	certificate, certificateError := tls.LoadX509KeyPair(clientConfig.Settings.CertPath, clientConfig.Settings.PrivatePEMPath)
-	if certificateError != nil {
-		return certificateError
-	}
-
-	tlsConfig := &tls.Config{
-		Certificates: []tls.Certificate{certificate},
-		MinVersion:   tls.VersionTLS13,
-	}
-
-	if insecure {
-		tlsConfig.InsecureSkipVerify = true
-	}
-
-	mtlsClient = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
-		},
-	}
-
-	return nil
-}
 
 func postIdentification(token string, server string, insecure bool) error {
 	// making the certs and CSR
@@ -193,7 +166,7 @@ func postProvisioning(flavor string) error {
 	return nil
 }
 
-func handleProvision(flavor string) (error, int) {
+func HandleProvision(flavor string) (error, int) {
 	log.Printf("Provisioning with flavor %v", flavor)
 
 	return cli.MustRegister([]cli.InitStep{
@@ -201,12 +174,12 @@ func handleProvision(flavor string) (error, int) {
 	})
 }
 
-func handleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
+func HandleRegistration(token string, server string, flavor string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
 	return cli.MustRegister([]cli.InitStep{
 		{Name: "identity", Function: func() error { return postIdentification(token, server, insecure) }},
-		{Name: "mtls client", Function: func() error { return initializeMtlsClient(insecure) }},
+		{Name: "mtls client", Function: func() error { return InitializeMtlsClient(insecure) }},
 		{Name: "provisioning", Function: func() error { return postProvisioning(flavor) }},
 	})
 

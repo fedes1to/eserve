@@ -1,4 +1,4 @@
-package main
+package admin
 
 // used for eservectl comms
 import (
@@ -9,7 +9,9 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
 
-func postCreateToken(w http.ResponseWriter, r *http.Request) {
+const SocketPath = "/run/eserved.sock"
+
+func PostCreateToken(w http.ResponseWriter, r *http.Request) {
 	token, tokenError := storage.CreateToken()
 
 	if tokenError != nil {
