@@ -3,6 +3,7 @@ package storage
 import (
 	"crypto/rand"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -24,7 +25,7 @@ type TokensFile struct {
 var (
 	tokens      TokensFile
 	tokensMutex sync.RWMutex
-	tokensPath  string = serverConfig.ServerConfigPath + "/tokens.json"
+	tokensPath  string = filepath.Join(serverConfig.ServerConfigPath, "tokens.json")
 )
 
 func LoadTokens() error {

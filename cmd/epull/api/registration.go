@@ -14,6 +14,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	clientConfig "git.fedesito.me/fedes1to/eserve/cmd/epull/config"
@@ -87,8 +88,8 @@ func postIdentification(token string, server string, insecure bool) error {
 		}
 	}
 
-	clientConfig.Settings.PrivatePEMPath = clientConfig.ClientConfigPath + "/" + hostname + ".key"
-	clientConfig.Settings.CertPath = clientConfig.ClientConfigPath + "/" + hostname + ".crt"
+	clientConfig.Settings.PrivatePEMPath = filepath.Join(clientConfig.ClientConfigPath, hostname+".key")
+	clientConfig.Settings.CertPath = filepath.Join(clientConfig.ClientConfigPath, hostname+".crt")
 	clientConfig.Settings.Server = server
 
 	// assuming everything went well here, so we save the request

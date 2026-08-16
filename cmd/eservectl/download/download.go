@@ -1,13 +1,13 @@
 package download
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -52,14 +52,11 @@ func DownloadFile(url string, dest string) string {
 	file := path.Base(url)
 	log.Printf("Downloading file %s from %s\n", file, url)
 
-	var path bytes.Buffer
-	path.WriteString(dest)
-	path.WriteString("/")
-	path.WriteString(file)
+	fullPath := filepath.Join(dest, file)
 	start := time.Now()
-	out, err := os.Create(path.String())
+	out, err := os.Create(fullPath)
 	if err != nil {
-		fmt.Println(path.String())
+		fmt.Println(fullPath)
 		panic(err)
 	}
 	defer out.Close()
@@ -76,7 +73,7 @@ func DownloadFile(url string, dest string) string {
 	}
 	done := make(chan int64)
 
-	go PrintDownloadPercent(done, path.String(), int64(size))
+	go PrintDownloadPercent(done, fullPath, int64(size))
 	resp, err := http.Get(url)
 	if err != nil {
 		panic(err)

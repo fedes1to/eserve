@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
@@ -25,7 +26,7 @@ type MachinesFile struct {
 var (
 	machines      MachinesFile
 	machinesMutex sync.RWMutex
-	machinesPath  = serverConfig.ServerConfigPath + "/machines.json"
+	machinesPath  = filepath.Join(serverConfig.ServerConfigPath, "machines.json")
 )
 
 func LoadMachines() error {

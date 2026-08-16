@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
+	"path/filepath"
 
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
@@ -22,7 +23,7 @@ type ServerSettings struct {
 var (
 	Settings           ServerSettings // i cant come up with a better naming system
 	ServerConfigPath   string         = config.InitConfigPath(config.ServerConfigPath)
-	serverSettingsPath string         = ServerConfigPath + "/settings.json"
+	serverSettingsPath string         = filepath.Join(ServerConfigPath, "settings.json")
 	ServerArch         string
 	ServerLibc         string
 )
@@ -49,9 +50,9 @@ func InitializeServerSettings() error {
 			Settings.PerUserThreads = 0
 			Settings.ChrootBase = "/srv/build"
 			Settings.ListenAddr = "127.0.0.1:8080"
-			Settings.TlsCertPath = ServerConfigPath + "/server.crt"
-			Settings.TlsKeyPath = ServerConfigPath + "/server.key"
-			Settings.StagePath = ServerConfigPath + "/stages"
+			Settings.TlsCertPath = filepath.Join(ServerConfigPath, "server.crt")
+			Settings.TlsKeyPath = filepath.Join(ServerConfigPath, "server.key")
+			Settings.StagePath = filepath.Join(ServerConfigPath, "stages")
 			return config.SafeSaveJsonFile(serverSettingsPath, Settings)
 		}
 		return statError

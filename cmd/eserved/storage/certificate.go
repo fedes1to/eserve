@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/big"
 	"os"
+	"path/filepath"
 	"time"
 
 	serverConfig "git.fedesito.me/fedes1to/eserve/cmd/eserved/config"
@@ -20,8 +21,8 @@ var (
 	CaCertificate     *x509.Certificate
 	CaKey             any
 	CaCertificatePEM  []byte
-	caCertificatePath string = serverConfig.ServerConfigPath + "/ca.crt"
-	caKeyPath         string = serverConfig.ServerConfigPath + "/ca.key"
+	caCertificatePath string = filepath.Join(serverConfig.ServerConfigPath, "ca.crt")
+	caKeyPath         string = filepath.Join(serverConfig.ServerConfigPath, "ca.key")
 	CaPool            *x509.CertPool
 )
 

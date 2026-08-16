@@ -36,7 +36,7 @@ func GetStageHash(filename string) (string, error) {
 		return "", pathError
 	}
 
-	return hashFileSHA256(stagePath + "/" + filename)
+	return hashFileSHA256(filepath.Join(stagePath, filename))
 
 }
 
@@ -60,7 +60,7 @@ func InstallStage(path string) error {
 	if pathError != nil {
 		return pathError
 	}
-	destinationFile, createError := os.Create(stagePath + "/" + filepath.Base(path))
+	destinationFile, createError := os.Create(filepath.Join(stagePath, filepath.Base(path)))
 	if createError != nil {
 		return createError
 	}

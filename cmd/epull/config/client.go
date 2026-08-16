@@ -1,6 +1,8 @@
 package clientConfig
 
 import (
+	"path/filepath"
+
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
@@ -13,7 +15,7 @@ type ClientSettings struct {
 var Settings ClientSettings // i cant come up with a better naming system
 
 var ClientConfigPath string = config.InitConfigPath(config.ClientConfigPath)
-var clientSettingsPath string = ClientConfigPath + "/settings.json"
+var clientSettingsPath string = filepath.Join(ClientConfigPath, "settings.json")
 
 // populates global var Client
 func LoadClientSettings() error {
