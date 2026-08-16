@@ -12,10 +12,10 @@ import (
 const SocketPath = "/run/eserved.sock"
 
 func PostCreateToken(w http.ResponseWriter, r *http.Request) {
-	token, tokenError := storage.CreateToken()
+	token, err := storage.CreateToken()
 
-	if tokenError != nil {
-		fmt.Fprintln(os.Stderr, "failed to create token,", tokenError)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "failed to create token,", err)
 		http.Error(w, "failed to create token, check logs", http.StatusInternalServerError)
 		return
 	}

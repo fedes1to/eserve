@@ -25,9 +25,9 @@ import (
 
 func postIdentification(token string, server string, insecure bool) error {
 	// making the certs and CSR
-	_, privKey, keyError := ed25519.GenerateKey(rand.Reader)
-	if keyError != nil {
-		return keyError
+	_, privKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
 	}
 
 	hostname, _ := os.Hostname()
@@ -35,10 +35,10 @@ func postIdentification(token string, server string, insecure bool) error {
 		// use hostname since its good enough
 		Subject: pkix.Name{CommonName: hostname},
 	}
-	csrDER, csrError := x509.CreateCertificateRequest(rand.Reader, csrTemplate, privKey)
+	csrDER, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, privKey)
 	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
-	if csrError != nil {
-		return csrError
+	if err != nil {
+		return err
 	}
 
 	keyDER, _ := x509.MarshalPKCS8PrivateKey(privKey)
@@ -66,8 +66,8 @@ func postIdentification(token string, server string, insecure bool) error {
 	request.Header.Set("Content-Type", "application/json")
 
 	var identificationResponse protocol.IdentificationResponse
-	if requestError := sendRequest(request, &identificationResponse, client); requestError != nil {
-		return requestError
+	if err := sendRequest(request, &identificationResponse, client); err != nil {
+		return err
 	}
 
 	// checks to be nice n shit
@@ -78,9 +78,9 @@ func postIdentification(token string, server string, insecure bool) error {
 			identificationResponse.CN)
 	}
 
-	validUntil, parseError := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
-	if parseError != nil {
-		fmt.Fprintln(os.Stderr, "Couldn't parse valid_until field,", parseError)
+	validUntil, err := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Couldn't parse valid_until field,", err)
 	} else {
 		daysLeft := time.Until(validUntil).Hours() / 24
 		if daysLeft < 30 {
@@ -93,37 +93,41 @@ func postIdentification(token string, server string, insecure bool) error {
 	clientConfig.Settings.Server = server
 
 	// assuming everything went well here, so we save the request
-	os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644)
-	os.WriteFile(clientConfig.Settings.PrivatePEMPath, keyPEM, 0600)
+	if err := os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644); err != nil {
+		return fmt.Errorf("failed to save certificate: %w", err)
+	}
+	if err := os.WriteFile(clientConfig.Settings.PrivatePEMPath, keyPEM, 0600); err != nil {
+		return fmt.Errorf("failed to save private key: %w", err)
+	}
 
-	if saveError := clientConfig.SaveClientSettings(); saveError != nil {
-		return saveError
+	if err := clientConfig.SaveClientSettings(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client) error {
-	response, responseError := httpClient.Do(request)
-	if responseError != nil {
-		return responseError
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return err
 	}
 	defer response.Body.Close()
 
 	if response.StatusCode != 200 {
-		bodyBytes, ioError := io.ReadAll(response.Body)
-		if ioError != nil {
+		bodyBytes, err := io.ReadAll(response.Body)
+		if err != nil {
 			return fmt.Errorf("Invalid response, got code %v without body due to: %w",
-				response.StatusCode, ioError)
+				response.StatusCode, err)
 		}
 		return fmt.Errorf("Invalid response, got code %v with body:\n%v",
 			response.StatusCode, string(bodyBytes))
 	}
 
 	// decode json to struct
-	jsonError := json.NewDecoder(response.Body).Decode(into)
-	if jsonError != nil {
-		return jsonError
+	err = json.NewDecoder(response.Body).Decode(into)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -139,19 +143,19 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 
 func postProvisioning(flavor string) error {
 	// Provisioning
-	cpuSubarch, subarchError := sysinfo.GetCpuSubarch()
-	if subarchError != nil {
-		return subarchError
+	cpuSubarch, err := sysinfo.GetCpuSubarch()
+	if err != nil {
+		return err
 	}
 
-	gccMachine, machineError := sysinfo.GetGccMachine()
-	if machineError != nil {
-		return machineError
+	gccMachine, err := sysinfo.GetGccMachine()
+	if err != nil {
+		return err
 	}
 
-	profile, profileError := sysinfo.GetPortageProfile()
-	if profileError != nil {
-		return profileError
+	profile, err := sysinfo.GetPortageProfile()
+	if err != nil {
+		return err
 	}
 
 	log.Printf("Found profile %v with subarch %v\n", profile, cpuSubarch)
@@ -159,9 +163,9 @@ func postProvisioning(flavor string) error {
 	// construct JSON provisioning payload
 	payload := protocol.ProvisionRequest{Subarch: cpuSubarch, GccMachine: gccMachine, Profile: profile, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
-	requestError := sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
-	if requestError != nil {
-		return requestError
+	err = sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
+	if err != nil {
+		return err
 	}
 
 	return nil

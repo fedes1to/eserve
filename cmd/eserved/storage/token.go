@@ -31,24 +31,24 @@ var (
 func LoadTokens() error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
-	if loadError := loadTokensLocked(); loadError != nil {
-		return loadError
+	if err := loadTokensLocked(); err != nil {
+		return err
 	}
 	return nil
 }
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func saveTokensLocked() error {
-	if saveError := config.SafeSaveJsonFile(tokensPath, tokens); saveError != nil {
-		return saveError
+	if err := config.SafeSaveJsonFile(tokensPath, tokens); err != nil {
+		return err
 	}
 	return nil
 }
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func loadTokensLocked() error {
-	if loadError := config.LoadJsonFile(tokensPath, &tokens); loadError != nil {
-		return loadError
+	if err := config.LoadJsonFile(tokensPath, &tokens); err != nil {
+		return err
 	}
 
 	if tokens.Entries == nil {

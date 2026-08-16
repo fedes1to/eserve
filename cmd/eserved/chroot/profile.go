@@ -20,9 +20,9 @@ func (profile Profile) IsCrossdev() bool {
 }
 
 func InitializeGccInfo() error {
-	gccMachine, getError := sysinfo.GetGccMachine()
-	if getError != nil {
-		return getError
+	gccMachine, err := sysinfo.GetGccMachine()
+	if err != nil {
+		return err
 	}
 	serverGccMachine = gccMachine
 	return nil

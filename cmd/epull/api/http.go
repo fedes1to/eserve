@@ -11,9 +11,9 @@ var mtlsClient *http.Client
 
 // config must be populated to call this method
 func InitializeMtlsClient(insecure bool) error {
-	certificate, certificateError := tls.LoadX509KeyPair(clientConfig.Settings.CertPath, clientConfig.Settings.PrivatePEMPath)
-	if certificateError != nil {
-		return certificateError
+	certificate, err := tls.LoadX509KeyPair(clientConfig.Settings.CertPath, clientConfig.Settings.PrivatePEMPath)
+	if err != nil {
+		return err
 	}
 
 	tlsConfig := &tls.Config{

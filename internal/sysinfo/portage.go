@@ -8,9 +8,9 @@ import (
 )
 
 func getPortageMarch() (string, error) {
-	output, portageError := exec.Command("portageq", "envvar", "CFLAGS").Output()
-	if portageError != nil {
-		return "", portageError
+	output, err := exec.Command("portageq", "envvar", "CFLAGS").Output()
+	if err != nil {
+		return "", err
 	}
 	flags := string(output)
 	for flag := range strings.FieldsSeq(flags) {
@@ -22,9 +22,9 @@ func getPortageMarch() (string, error) {
 }
 
 func GetPortageProfile() (string, error) {
-	makeLink, linkError := os.Readlink("/etc/portage/make.profile")
-	if linkError != nil {
-		return "", linkError
+	makeLink, err := os.Readlink("/etc/portage/make.profile")
+	if err != nil {
+		return "", err
 	}
 	_, profile, found := strings.Cut(makeLink, "profiles/")
 	if !found {

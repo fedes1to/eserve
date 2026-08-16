@@ -50,17 +50,17 @@ func serveHTTP(adminEnabled bool) error {
 		adminMux.HandleFunc("/admin/v1/create_token", admin.PostCreateToken)
 
 		os.Remove(admin.SocketPath)
-		unixSocket, listenError := net.Listen("unix", admin.SocketPath)
-		if listenError != nil {
-			return listenError
+		unixSocket, err := net.Listen("unix", admin.SocketPath)
+		if err != nil {
+			return err
 		}
 		defer unixSocket.Close()
 		os.Chmod(admin.SocketPath, 0600)
 		adminServer := &http.Server{Handler: adminMux}
 
 		go func() {
-			if serveError := adminServer.Serve(unixSocket); serveError != nil {
-				fmt.Fprintln(os.Stderr, "Failed to serve admin socket,", serveError)
+			if err := adminServer.Serve(unixSocket); err != nil {
+				fmt.Fprintln(os.Stderr, "Failed to serve admin socket,", err)
 			}
 		}()
 	}
@@ -68,20 +68,17 @@ func serveHTTP(adminEnabled bool) error {
 	tlsCfg := &tls.Config{
 		Certificates: []tls.Certificate{storage.TlsCertificate},
 		ClientCAs:    storage.CaPool,
-		ClientAuth:   tls.VerifyClientCertIfGiven,
+		ClientAuth:   tls.RequireAndVerifyClientCert,
 		MinVersion:   tls.VersionTLS13,
 	}
 
 	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("/api/v1/provision", api.PostProvision)
-
-	outerMux := http.NewServeMux()
-	outerMux.HandleFunc("/api/v1/identity", api.PostIdentity) // specifically here we dont mTLS
-	outerMux.Handle("/", requireClientCert(apiMux))
+	apiMux.HandleFunc("/api/v1/identity", api.PostIdentity)
+	apiMux.Handle("/api/v1/provision", requireClientCert(http.HandlerFunc(api.PostProvision)))
 
 	apiServer := &http.Server{
 		Addr:      serverConfig.Settings.ListenAddr,
-		Handler:   outerMux,
+		Handler:   apiMux,
 		TLSConfig: tlsCfg,
 	}
 	return apiServer.ListenAndServeTLS("", "")

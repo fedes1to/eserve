@@ -15,15 +15,15 @@ func parseTokenFlags() (error, int) {
 	create := flag.Bool("create", false, "requests a token to be created on eserved")
 	flag.Parse()
 
-	connectError := admin.TryConnect()
-	if connectError != nil {
-		return fmt.Errorf("Can't connect, %w", connectError), 0
+	err := admin.TryConnect()
+	if err != nil {
+		return fmt.Errorf("Can't connect, %w", err), 0
 	}
 
 	if *create {
-		token, createError := admin.CreateToken()
-		if createError != nil {
-			return fmt.Errorf("Couldn't create token, %w", createError), 1
+		token, err := admin.CreateToken()
+		if err != nil {
+			return fmt.Errorf("Couldn't create token, %w", err), 1
 		}
 		log.Println("New token:", token)
 		return nil, 0
@@ -48,21 +48,21 @@ func parseStage() (error, int) {
 		if *url == "" {
 			return fmt.Errorf("URL must be provided for download"), 2
 		}
-		fileName, downloadError := storage.DownloadStage(*url)
-		if downloadError != nil {
-			return downloadError, 1
+		fileName, err := storage.DownloadStage(*url)
+		if err != nil {
+			return err, 1
 		}
-		sha256sum, shaError := storage.GetStageHash(fileName)
-		if shaError != nil {
-			return fmt.Errorf("Download succeeded but couldn't get SHA256 hash, %w", shaError), 1
+		sha256sum, err := storage.GetStageHash(fileName)
+		if err != nil {
+			return fmt.Errorf("Download succeeded but couldn't get SHA256 hash, %w", err), 1
 		}
 		log.Printf("sha256sum of %v: %v", fileName, sha256sum)
 
 	case "install":
 		path := flag.String("path", "", "local path for the stagefile to install")
 		flag.Parse()
-		if installError := storage.InstallStage(*path); installError != nil {
-			return installError, 1
+		if err := storage.InstallStage(*path); err != nil {
+			return err, 1
 		}
 	}
 
@@ -79,13 +79,13 @@ func main() {
 
 	switch os.Args[1] {
 	case "token":
-		if parseError, exitCode := parseTokenFlags(); parseError != nil {
-			fmt.Fprintln(os.Stderr, "Something went wrong,", parseError)
+		if err, exitCode := parseTokenFlags(); err != nil {
+			fmt.Fprintln(os.Stderr, "Something went wrong,", err)
 			os.Exit(exitCode)
 		}
 	case "stage":
-		if parseError, exitCode := parseTokenFlags(); parseError != nil {
-			fmt.Fprintln(os.Stderr, "Something went wrong,", parseError)
+		if err, exitCode := parseStage(); err != nil {
+			fmt.Fprintln(os.Stderr, "Something went wrong,", err)
 			os.Exit(exitCode)
 		}
 	}

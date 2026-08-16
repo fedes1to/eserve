@@ -33,8 +33,8 @@ func parseProvision() (error, int) {
 	flavor := flag.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
 	insecure := flag.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 	flag.Parse()
-	if initError := api.InitializeMtlsClient(*insecure); initError != nil {
-		return initError, 1
+	if err := api.InitializeMtlsClient(*insecure); err != nil {
+		return err, 1
 	}
 
 	return api.HandleProvision(*flavor)
@@ -48,22 +48,22 @@ func main() {
 		os.Exit(2)
 	}
 
-	if loadError := clientConfig.LoadClientSettings(); loadError != nil {
-		fmt.Fprintln(os.Stderr, "Fail to load settings,", loadError)
+	if err := clientConfig.LoadClientSettings(); err != nil {
+		fmt.Fprintln(os.Stderr, "Fail to load settings,", err)
 		os.Exit(1)
 	}
 
 	switch os.Args[1] {
 	case "register":
-		registerError, exitCode := parseRegister()
-		if registerError != nil {
-			fmt.Fprintln(os.Stderr, "Registration went wrong,", registerError)
+		err, exitCode := parseRegister()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Registration went wrong,", err)
 		}
 		os.Exit(exitCode)
 	case "provision":
-		provisionError, exitCode := parseProvision()
-		if provisionError != nil {
-			fmt.Fprintln(os.Stderr, "Provision went wrong,", provisionError)
+		err, exitCode := parseProvision()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Provision went wrong,", err)
 		}
 		os.Exit(exitCode)
 	}

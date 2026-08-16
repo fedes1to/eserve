@@ -31,8 +31,8 @@ func LoadServerSettings() error {
 }
 
 func InitializeServerSettings() error {
-	if _, statError := os.Stat(serverSettingsPath); statError != nil {
-		if errors.Is(statError, os.ErrNotExist) {
+	if _, err := os.Stat(serverSettingsPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
 			log.Println("Generating default server config")
 			Settings.BuildThreads = 0
 			Settings.PerUserThreads = 0
@@ -43,7 +43,7 @@ func InitializeServerSettings() error {
 			Settings.StagePath = filepath.Join(ServerConfigPath, "stages")
 			return config.SafeSaveJsonFile(serverSettingsPath, Settings)
 		}
-		return statError
+		return err
 	}
 
 	return LoadServerSettings()

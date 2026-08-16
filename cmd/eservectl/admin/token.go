@@ -6,15 +6,15 @@ import (
 )
 
 func CreateToken() (string, error) {
-	response, postError := adminClient.Post("http://unix/admin/v1/create_token", "", nil)
-	if postError != nil {
-		return "", postError
+	response, err := adminClient.Post("http://unix/admin/v1/create_token", "", nil)
+	if err != nil {
+		return "", err
 	}
 	defer response.Body.Close()
 
-	bodyBytes, ioError := io.ReadAll(response.Body)
-	if ioError != nil {
-		return "", ioError
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
 	}
 
 	bodyString := string(bodyBytes)

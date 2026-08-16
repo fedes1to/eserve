@@ -34,36 +34,34 @@ func RandomSerial() *big.Int {
 }
 
 func LoadCaCertificate() error {
-	if _, certError := os.Stat(caCertificatePath); errors.Is(certError, os.ErrNotExist) {
+	if _, err := os.Stat(caCertificatePath); errors.Is(err, os.ErrNotExist) {
 		if err := generateCa(); err != nil {
-			return certError
+			return err
 		}
 		log.Println("created new CA certificate at", caCertificatePath)
 	}
 
-	var pemError error
-	CaCertificatePEM, pemError = os.ReadFile(caCertificatePath)
-	if pemError != nil {
-		return pemError
+	var err error
+	CaCertificatePEM, err = os.ReadFile(caCertificatePath)
+	if err != nil {
+		return err
 	}
 	pemBlock, _ := pem.Decode(CaCertificatePEM)
 
-	var certError error
-	CaCertificate, certError = x509.ParseCertificate(pemBlock.Bytes)
-	if certError != nil {
-		return certError
+	CaCertificate, err = x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		return err
 	}
 
-	keyPEM, keyError := os.ReadFile(caKeyPath)
-	if keyError != nil {
-		return keyError
+	keyPEM, err := os.ReadFile(caKeyPath)
+	if err != nil {
+		return err
 	}
 
 	keyBlock, _ := pem.Decode(keyPEM)
-	var caKeyError error
-	CaKey, caKeyError = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
-	if caKeyError != nil {
-		return caKeyError
+	CaKey, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+	if err != nil {
+		return err
 	}
 
 	CaPool = x509.NewCertPool()
@@ -76,9 +74,9 @@ func LoadCaCertificate() error {
 
 // TODO: distributed signing using intermediate certs
 func generateCa() error {
-	publicKey, privateKey, keyError := ed25519.GenerateKey(rand.Reader)
-	if keyError != nil {
-		return keyError
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
 	}
 
 	template := &x509.Certificate{
@@ -91,20 +89,20 @@ func generateCa() error {
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 
-	certificate, certificateError := x509.CreateCertificate(rand.Reader, template,
+	certificate, err := x509.CreateCertificate(rand.Reader, template,
 		template, publicKey, privateKey)
-	if certificateError != nil {
-		return certificateError
+	if err != nil {
+		return err
 	}
 
 	certificatePEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate})
-	if fileError := os.WriteFile(caCertificatePath, certificatePEM, 0644); fileError != nil {
-		return fileError
+	if err := os.WriteFile(caCertificatePath, certificatePEM, 0644); err != nil {
+		return err
 	}
 
-	keyDER, pkcs8Error := x509.MarshalPKCS8PrivateKey(privateKey)
-	if pkcs8Error != nil {
-		return pkcs8Error
+	keyDER, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return err
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 	return os.WriteFile(caKeyPath, keyPEM, 0600)

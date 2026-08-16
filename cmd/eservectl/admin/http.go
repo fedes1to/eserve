@@ -11,9 +11,9 @@ var socketPath string = "/run/eserved.sock"
 var adminClient *http.Client = initAdminClient()
 
 func TryConnect() error {
-	dial, dialError := net.DialTimeout("unix", socketPath, time.Second)
-	if dialError != nil {
-		return dialError
+	dial, err := net.DialTimeout("unix", socketPath, time.Second)
+	if err != nil {
+		return err
 	}
 	dial.Close()
 	return nil

@@ -32,24 +32,24 @@ var (
 func LoadMachines() error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
-	if loadError := loadMachinesLocked(); loadError != nil {
-		return loadError
+	if err := loadMachinesLocked(); err != nil {
+		return err
 	}
 	return nil
 }
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func saveMachinesLocked() error {
-	if saveError := config.SafeSaveJsonFile(machinesPath, machines); saveError != nil {
-		return saveError
+	if err := config.SafeSaveJsonFile(machinesPath, machines); err != nil {
+		return err
 	}
 	return nil
 }
 
 // READ THE FUCKING NAME, USE ONLY WHEN LOCKED
 func loadMachinesLocked() error {
-	if loadError := config.LoadJsonFile(machinesPath, &machines); loadError != nil {
-		return loadError
+	if err := config.LoadJsonFile(machinesPath, &machines); err != nil {
+		return err
 	}
 
 	if machines.Entries == nil {

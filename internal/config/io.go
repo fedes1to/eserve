@@ -10,51 +10,51 @@ import (
 
 func SafeSaveJsonFile(path string, from any) error {
 	backupPath := path + ".old"
-	oldJson, openError := os.Open(path)
-	backupJson, backupError := os.Create(backupPath)
+	oldJson, openErr := os.Open(path)
+	backupJson, backupErr := os.Create(backupPath)
 
-	if openError != nil && !errors.Is(openError, os.ErrNotExist) {
-		fmt.Fprintln(os.Stderr, "Couldn't open old JSON for backup,", openError)
-	} else if backupError != nil {
-		fmt.Fprintln(os.Stderr, "Couldn't access target backup JSON,", backupError)
-	} else if openError == nil {
-		_, copyError := io.Copy(backupJson, oldJson)
-		if copyError != nil {
-			fmt.Fprintln(os.Stderr, "Couldn't copy backup JSON,", copyError)
+	if openErr != nil && !errors.Is(openErr, os.ErrNotExist) {
+		fmt.Fprintln(os.Stderr, "Couldn't open old JSON for backup,", openErr)
+	} else if backupErr != nil {
+		fmt.Fprintln(os.Stderr, "Couldn't access target backup JSON,", backupErr)
+	} else if openErr == nil {
+		_, copyErr := io.Copy(backupJson, oldJson)
+		if copyErr != nil {
+			fmt.Fprintln(os.Stderr, "Couldn't copy backup JSON,", copyErr)
 		}
 		defer oldJson.Close()
 		defer backupJson.Close()
 	}
 
 	// truncates if it exists, thats why we made a .old
-	jsonFile, createError := os.Create(path)
-	if createError != nil {
-		return createError
+	jsonFile, err := os.Create(path)
+	if err != nil {
+		return err
 	}
 	defer jsonFile.Close()
 
 	encoder := json.NewEncoder(jsonFile)
 	encoder.SetIndent("", "  ") // make it tolerable to see
-	if encodeError := encoder.Encode(from); encodeError != nil {
-		return encodeError
+	if err := encoder.Encode(from); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func LoadJsonFile[T any](path string, into *T) error {
-	jsonFile, openError := os.Open(path)
-	if openError != nil {
-		if errors.Is(openError, os.ErrNotExist) {
+	jsonFile, err := os.Open(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil // its just an empty file
 		}
-		return openError
+		return err
 	}
 	defer jsonFile.Close()
 
 	decoder := json.NewDecoder(jsonFile)
-	if decodeError := decoder.Decode(into); decodeError != nil {
-		return decodeError
+	if err := decoder.Decode(into); err != nil {
+		return err
 	}
 	return nil
 }

@@ -7,15 +7,15 @@ import (
 )
 
 func GetStageList() ([]string, error) {
-	stagePath, pathError := GetStagePath()
-	if pathError != nil {
-		return nil, pathError
-	}
-	f, err := os.Open(stagePath)
-	defer func() { _ = f.Close() }()
+	stagePath, err := GetStagePath()
 	if err != nil {
 		return nil, err
 	}
+	f, err := os.Open(stagePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 	fns, err := f.Readdirnames(-1)
 	if err != nil {
 		return nil, err
@@ -25,9 +25,9 @@ func GetStageList() ([]string, error) {
 
 func GetStagePath() (string, error) {
 	if serverConfig.Settings.StagePath == "" {
-		loadError := serverConfig.LoadServerSettings()
-		if loadError != nil {
-			return "", loadError
+		err := serverConfig.LoadServerSettings()
+		if err != nil {
+			return "", err
 		}
 	}
 

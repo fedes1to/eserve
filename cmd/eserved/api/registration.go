@@ -26,8 +26,7 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var identificationRequest protocol.IdentificationRequest
-	decodeError := json.NewDecoder(r.Body).Decode(&identificationRequest)
-	if decodeError != nil {
+	if err := json.NewDecoder(r.Body).Decode(&identificationRequest); err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
@@ -38,8 +37,8 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	csr, csrError := x509.ParseCertificateRequest(block.Bytes)
-	if csrError != nil {
+	csr, err := x509.ParseCertificateRequest(block.Bytes)
+	if err != nil {
 		http.Error(w, "cant parse csr", http.StatusBadRequest)
 		return
 	}
@@ -58,10 +57,10 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
 	}
 
-	certificate, certificateError := x509.CreateCertificate(rand.Reader, template,
+	certificate, err := x509.CreateCertificate(rand.Reader, template,
 		storage.CaCertificate, csr.PublicKey, storage.CaKey)
 
-	if certificateError != nil {
+	if err != nil {
 		http.Error(w, "signing cert failed", http.StatusInternalServerError)
 		return
 	}
@@ -73,18 +72,18 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if tokenError := storage.UseToken(token, csr.Subject.CommonName); tokenError != nil {
+	if err := storage.UseToken(token, csr.Subject.CommonName); err != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}
 
 	fingerprint := sha256.Sum256(certificate)
-	if upsertError := storage.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); upsertError != nil {
+	if err := storage.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); err != nil {
 		http.Error(w, "couldn't upsert machine", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if encodeError := json.NewEncoder(w).Encode(response); encodeError != nil {
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "couldn't encode response", http.StatusInternalServerError)
 		return
 	}
@@ -92,17 +91,15 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 
 func PostProvision(w http.ResponseWriter, r *http.Request) {
 	var provisionRequest protocol.ProvisionRequest
-	decodeError := json.NewDecoder(r.Body).Decode(&provisionRequest)
-	if decodeError != nil {
+	if err := json.NewDecoder(r.Body).Decode(&provisionRequest); err != nil {
 		http.Error(w, "couldn't decode provisionRequest", http.StatusBadRequest)
 		return
 	}
 
 	identity := r.Context().Value(CtxKeyIdentity).(ClientIdentity)
-	provisionError := storage.ProvisionMachine(
-		identity.CN, provisionRequest.Subarch, provisionRequest.GccMachine, provisionRequest.Profile, provisionRequest.Flavor)
-	if provisionError != nil {
-		log.Printf("%v: %v\n", ClientIP(r), provisionError)
+	if err := storage.ProvisionMachine(
+		identity.CN, provisionRequest.Subarch, provisionRequest.GccMachine, provisionRequest.Profile, provisionRequest.Flavor); err != nil {
+		log.Printf("%v: %v\n", ClientIP(r), err)
 		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)
 		return
 	}

@@ -19,27 +19,27 @@ import (
 var TlsCertificate tls.Certificate
 
 func LoadTlsCertificates() error {
-	if _, statError := os.Stat(serverConfig.Settings.TlsCertPath); errors.Is(statError, os.ErrNotExist) {
+	if _, err := os.Stat(serverConfig.Settings.TlsCertPath); errors.Is(err, os.ErrNotExist) {
 		log.Println("no server cert found, generating self-signed cert")
-		if generateError := generateSelfSigned(); generateError != nil {
-			return generateError
+		if err := generateSelfSigned(); err != nil {
+			return err
 		}
-	} else if statError != nil {
-		return fmt.Errorf("checking server cert: %w", statError)
+	} else if err != nil {
+		return fmt.Errorf("checking server cert: %w", err)
 	}
 
-	cert, certError := tls.LoadX509KeyPair(serverConfig.Settings.TlsCertPath, serverConfig.Settings.TlsKeyPath)
-	if certError != nil {
-		return fmt.Errorf("loading server cert: %w", certError)
+	cert, err := tls.LoadX509KeyPair(serverConfig.Settings.TlsCertPath, serverConfig.Settings.TlsKeyPath)
+	if err != nil {
+		return fmt.Errorf("loading server cert: %w", err)
 	}
 	TlsCertificate = cert
 	return nil
 }
 
 func generateSelfSigned() error {
-	publicKey, privateKey, keyError := ed25519.GenerateKey(rand.Reader)
-	if keyError != nil {
-		return keyError
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return err
 	}
 
 	template := &x509.Certificate{
@@ -51,19 +51,19 @@ func generateSelfSigned() error {
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 	}
 
-	certificate, certificateError := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
-	if certificateError != nil {
-		return certificateError
+	certificate, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	if err != nil {
+		return err
 	}
 
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate})
-	if writeError := os.WriteFile(serverConfig.Settings.TlsCertPath, certPEM, 0644); writeError != nil {
-		return writeError
+	if err := os.WriteFile(serverConfig.Settings.TlsCertPath, certPEM, 0644); err != nil {
+		return err
 	}
 
-	keyDER, keyError := x509.MarshalPKCS8PrivateKey(privateKey)
-	if keyError != nil {
-		return keyError
+	keyDER, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return err
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 	return os.WriteFile(serverConfig.Settings.TlsKeyPath, keyPEM, 0600)

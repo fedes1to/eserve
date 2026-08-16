@@ -14,16 +14,16 @@ import (
 
 // https://transloadit.com/devtips/verify-file-integrity-with-go-and-sha256/
 func hashFileSHA256(filePath string) (string, error) {
-	file, openError := os.Open(filePath)
-	if openError != nil {
-		return "", fmt.Errorf("failed to open file: %w", openError)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file: %w", err)
 	}
 	defer file.Close()
 
 	hash := sha256.New()
 
-	if _, copyError := io.Copy(hash, file); copyError != nil {
-		return "", fmt.Errorf("failed to copy file content to hash: %w", copyError)
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", fmt.Errorf("failed to copy file content to hash: %w", err)
 	}
 
 	hashInBytes := hash.Sum(nil)
@@ -31,9 +31,9 @@ func hashFileSHA256(filePath string) (string, error) {
 }
 
 func GetStageHash(filename string) (string, error) {
-	stagePath, pathError := sharedStorage.GetStagePath()
-	if pathError != nil {
-		return "", pathError
+	stagePath, err := sharedStorage.GetStagePath()
+	if err != nil {
+		return "", err
 	}
 
 	return hashFileSHA256(filepath.Join(stagePath, filename))
@@ -41,34 +41,34 @@ func GetStageHash(filename string) (string, error) {
 }
 
 func DownloadStage(url string) (string, error) {
-	stagePath, pathError := sharedStorage.GetStagePath()
-	if pathError != nil {
-		return "", pathError
+	stagePath, err := sharedStorage.GetStagePath()
+	if err != nil {
+		return "", err
 	}
 
 	return download.DownloadFile(stagePath, url), nil
 }
 
 func InstallStage(path string) error {
-	sourceFile, openError := os.Open(path)
-	if openError != nil {
-		return openError
+	sourceFile, err := os.Open(path)
+	if err != nil {
+		return err
 	}
 	defer sourceFile.Close()
 
-	stagePath, pathError := sharedStorage.GetStagePath()
-	if pathError != nil {
-		return pathError
+	stagePath, err := sharedStorage.GetStagePath()
+	if err != nil {
+		return err
 	}
-	destinationFile, createError := os.Create(filepath.Join(stagePath, filepath.Base(path)))
-	if createError != nil {
-		return createError
+	destinationFile, err := os.Create(filepath.Join(stagePath, filepath.Base(path)))
+	if err != nil {
+		return err
 	}
 	defer destinationFile.Close()
 
-	_, copyError := io.Copy(destinationFile, sourceFile)
-	if copyError != nil {
-		return copyError
+	_, err = io.Copy(destinationFile, sourceFile)
+	if err != nil {
+		return err
 	}
 
 	return nil
