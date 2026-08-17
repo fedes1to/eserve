@@ -33,7 +33,7 @@ func GetCpuSubarch() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if portageMarch != "" {
+	if portageMarch != "" && portageMarch != "native" {
 		return portageMarch, nil
 	}
 	return getGccMarch()

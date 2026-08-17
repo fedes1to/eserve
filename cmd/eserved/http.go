@@ -83,7 +83,7 @@ func serveHTTP(adminEnabled bool) error {
 	tlsCfg := &tls.Config{
 		Certificates: []tls.Certificate{storage.TlsCertificate},
 		ClientCAs:    storage.CaPool,
-		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientAuth:   tls.RequestClientCert,
 		MinVersion:   tls.VersionTLS13,
 	}
 

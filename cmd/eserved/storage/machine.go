@@ -68,7 +68,7 @@ func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
 		return fmt.Errorf("machine %v has no certificate — run identity first", cn)
 	}
 
-	if machines.Entries[cn].Profile.IsCrossdev() {
+	if chroot.IsGccMachineDiff(gccMachine) {
 		return fmt.Errorf("Crossdev support not implemented, choose same arch as eserved")
 	}
 

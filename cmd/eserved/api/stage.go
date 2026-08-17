@@ -12,8 +12,8 @@ func GetStages(w http.ResponseWriter, r *http.Request) {
 	stageList, err := sharedStorage.GetStageList()
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to create token,", err)
-		http.Error(w, "failed to create token, check logs", http.StatusInternalServerError)
+		fmt.Fprintln(os.Stderr, "failed to get stages,", err)
+		http.Error(w, "failed to get stages, check logs", http.StatusInternalServerError)
 		return
 	}
 

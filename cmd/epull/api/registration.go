@@ -88,9 +88,11 @@ func postIdentification(token string, server string, insecure bool) error {
 		}
 	}
 
-	clientConfig.Settings.PrivatePEMPath = filepath.Join(clientConfig.ClientConfigPath, hostname+".key")
-	clientConfig.Settings.CertPath = filepath.Join(clientConfig.ClientConfigPath, hostname+".crt")
-	clientConfig.Settings.Server = server
+	clientConfig.Settings = clientConfig.ClientSettings{
+		PrivatePEMPath: filepath.Join(clientConfig.ClientConfigPath, hostname+".key"),
+		CertPath:       filepath.Join(clientConfig.ClientConfigPath, hostname+".crt"),
+		Server:         server,
+	}
 
 	// assuming everything went well here, so we save the request
 	if err := os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644); err != nil {
@@ -131,14 +133,6 @@ func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client)
 	}
 
 	return nil
-}
-
-func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
-	body, _ := json.Marshal(payload)
-	request, _ := http.NewRequest("POST", clientConfig.Settings.Server+subUrl, bytes.NewReader(body))
-	request.Header.Set("Content-Type", "application/json")
-
-	return sendRequest(request, into, mtlsClient)
 }
 
 func postProvisioning(flavor, stage string) error {

@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 )
 
 func GetStages() (string, error) {
-	response, err := mtlsClient.Get("/api/v1/stages")
+	response, err := mtlsClient.Get(clientConfig.Settings.Server + "/api/v1/stages")
 	if err != nil {
 		return "", err
 	}
@@ -31,13 +33,23 @@ func AskStagefile() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if stagesString == "" {
+		return "", fmt.Errorf("Server has no stages, please download one first")
+	}
 	stages := strings.Split(stagesString, "\n")
 	for i, stage := range stages {
-		fmt.Printf("[%v] %v\n", i, stage)
+		if stage != "" {
+			fmt.Printf("[%v] %v\n", i+1, stage)
+		}
 	}
 	fmt.Print("Select your stage: ")
 	var stageIndex int
-	fmt.Scanln("%v", &stageIndex)
+	if _, err := fmt.Scanln(&stageIndex); err != nil {
+		return "", fmt.Errorf("invalid input: %w", err)
+	}
+	if stageIndex < 1 || stageIndex > len(stages) {
+		return "", fmt.Errorf("stage %d out of range", stageIndex)
+	}
 
-	return stages[stageIndex], nil
+	return stages[stageIndex-1], nil
 }

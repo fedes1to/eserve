@@ -14,7 +14,11 @@ type Profile struct {
 }
 
 func (profile Profile) IsCrossdev() bool {
-	clientArch, _, _ := strings.Cut(profile.GccMachine, "-")
+	return IsGccMachineDiff(profile.GccMachine)
+}
+
+func IsGccMachineDiff(clientGccMachine string) bool {
+	clientArch, _, _ := strings.Cut(clientGccMachine, "-")
 	serverArch, _, _ := strings.Cut(serverGccMachine, "-")
 	return clientArch != serverArch
 }

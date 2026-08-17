@@ -37,19 +37,19 @@ func parseProvision() (error, int) {
 	stage := fs.String("stage", "", "Stage3 file used on provisioning")
 	fs.Parse(os.Args[2:])
 
+	if err := clientConfig.LoadClientSettings(); err != nil {
+		return err, 1
+	}
+	if err := api.InitializeMtlsClient(*insecure); err != nil {
+		return err, 1
+	}
+
 	if *stage == "" {
 		var err error
 		*stage, err = api.AskStagefile()
 		if err != nil {
 			return err, 1
 		}
-	}
-
-	if err := clientConfig.LoadClientSettings(); err != nil {
-		return err, 1
-	}
-	if err := api.InitializeMtlsClient(*insecure); err != nil {
-		return err, 1
 	}
 
 	return api.HandleProvision(*flavor, *stage)
@@ -59,6 +59,7 @@ func main() {
 	if len(os.Args) < 2 {
 		cli.PrintUsage("epull", []cli.Command{
 			{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
+			{Name: "provision", Description: "Provisions your machine on the target server"},
 		})
 		os.Exit(2)
 	}
