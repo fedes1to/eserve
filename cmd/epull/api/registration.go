@@ -142,7 +142,6 @@ func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
 }
 
 func postProvisioning(flavor, stage string) error {
-	// Provisioning
 	cpuSubarch, err := sysinfo.GetCpuSubarch()
 	if err != nil {
 		return err

@@ -1,3 +1,3 @@
 module git.fedesito.me/fedes1to/eserve
 
-go 1.26.5
+go 1.26.4
