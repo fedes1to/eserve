@@ -19,7 +19,6 @@ type ProvisionRequest struct {
 }
 
 type ProvisionResponse struct {
-	JobID      string `json:"job_id,omitempty"`
+	JobID      string `json:"job_id"`
 	BinhostURL string `json:"binhost_url"`
-	NewChroot  bool   `json:"new_chroot"`
 }

@@ -93,6 +93,8 @@ func serveHTTP(adminEnabled bool) error {
 	apiMux.HandleFunc(urls.IdentitySuburl, api.PostIdentity)
 	apiMux.Handle(urls.ProvisionSuburl, requireClientCert(http.HandlerFunc(api.PostProvision)))
 	apiMux.Handle(urls.StagesSuburl, requireClientCert(http.HandlerFunc(api.GetStages)))
+	apiMux.Handle(urls.JobsStreamSuburl, requireClientCert(http.HandlerFunc(api.GetJobStream)))
+	apiMux.Handle(urls.JobsCancelSuburl, requireClientCert(http.HandlerFunc(api.PostCancelJob)))
 
 	apiServer := &http.Server{
 		Addr:      serverConfig.Settings.ListenAddr,

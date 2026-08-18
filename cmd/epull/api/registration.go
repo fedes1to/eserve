@@ -10,18 +10,18 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/storage"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
+	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
+	"git.fedesito.me/fedes1to/eserve/internal/urls"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
-
-	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
-	"git.fedesito.me/fedes1to/eserve/internal/cli"
-	"git.fedesito.me/fedes1to/eserve/internal/protocol"
-	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
-	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
 func postIdentification(token string, server string, insecure bool) error {
@@ -110,14 +110,19 @@ func postIdentification(token string, server string, insecure bool) error {
 	return nil
 }
 
-func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client) error {
+func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client, expectedStatus ...int) error {
 	response, err := httpClient.Do(request)
 	if err != nil {
 		return err
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != 200 {
+	expected := http.StatusOK
+	if len(expectedStatus) > 0 {
+		expected = expectedStatus[0]
+	}
+
+	if response.StatusCode != expected {
 		bodyBytes, err := io.ReadAll(response.Body)
 		if err != nil {
 			return fmt.Errorf("Invalid response, got code %v without body due to: %w",
@@ -155,14 +160,25 @@ func postProvisioning(flavor, stage string) error {
 	log.Printf("Found profile %v with subarch %v\n", profile, cpuSubarch)
 
 	// construct JSON provisioning payload
-	payload := protocol.ProvisionRequest{GccMachine: gccMachine, Subarch: cpuSubarch, Profile: profile, Stagefile: stage, Flavor: flavor}
+	payload := protocol.ProvisionRequest{
+		GccMachine: gccMachine,
+		Subarch:    cpuSubarch,
+		Profile:    profile,
+		Stagefile:  stage,
+		Flavor:     flavor,
+	}
 	var provisionResponse protocol.ProvisionResponse
-	err = sendMtlsRequest(urls.ProvisionSuburl, payload, &provisionResponse)
+	err = sendMtlsRequest(urls.ProvisionSuburl, payload, &provisionResponse, http.StatusAccepted)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	err = getStreamJob(provisionResponse.JobID)
+	if err != nil {
+		return err
+	}
+
+	return storage.WriteBinhostConfig(flavor, provisionResponse.BinhostURL)
 }
 
 func HandleProvision(flavor, stage string) (error, int) {

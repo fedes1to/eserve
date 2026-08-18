@@ -11,12 +11,12 @@ import (
 
 var mtlsClient *http.Client
 
-func sendMtlsRequest[T any](subUrl string, payload any, into *T) error {
+func sendMtlsRequest[T any](subUrl string, payload any, into *T, expectedStatus ...int) error {
 	body, _ := json.Marshal(payload)
 	request, _ := http.NewRequest("POST", clientConfig.Settings.Server+subUrl, bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 
-	return sendRequest(request, into, mtlsClient)
+	return sendRequest(request, into, mtlsClient, expectedStatus...)
 }
 
 // config must be populated to call this method

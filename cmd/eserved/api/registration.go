@@ -88,22 +88,3 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
-func PostProvision(w http.ResponseWriter, r *http.Request) {
-	var provisionRequest protocol.ProvisionRequest
-	if err := json.NewDecoder(r.Body).Decode(&provisionRequest); err != nil {
-		http.Error(w, "couldn't decode provisionRequest", http.StatusBadRequest)
-		return
-	}
-
-	identity := r.Context().Value(CtxKeyIdentity).(ClientIdentity)
-	if err := storage.ProvisionMachine(
-		identity.CN, provisionRequest.Subarch, provisionRequest.GccMachine, provisionRequest.Profile, provisionRequest.Flavor); err != nil {
-		log.Printf("%v: %v\n", ClientIP(r), err)
-		http.Error(w, "couldn't provision machine", http.StatusInternalServerError)
-		return
-	}
-
-	
-
-}

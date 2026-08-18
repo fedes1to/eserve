@@ -99,6 +99,14 @@ func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
 	return saveMachinesLocked()
 }
 
+func MachineExists(cn string) bool {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	_, exists := machines.Entries[cn]
+	return exists
+}
+
 func IsMachineCrossdev(cn string) bool {
 	machinesMutex.RLock()
 	defer machinesMutex.RUnlock()
