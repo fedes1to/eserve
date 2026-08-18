@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
+	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
 func GetStages() (string, error) {
-	response, err := mtlsClient.Get(clientConfig.Settings.Server + "/api/v1/stages")
+	response, err := mtlsClient.Get(clientConfig.Settings.Server + urls.StagesSuburl)
 	if err != nil {
 		return "", err
 	}

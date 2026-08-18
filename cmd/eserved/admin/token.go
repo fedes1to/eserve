@@ -9,8 +9,6 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 )
 
-const SocketPath = "/run/eserved.sock"
-
 func PostCreateToken(w http.ResponseWriter, r *http.Request) {
 	token, err := storage.CreateToken()
 

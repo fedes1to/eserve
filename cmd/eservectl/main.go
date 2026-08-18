@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eservectl/storage"
@@ -13,29 +14,32 @@ import (
 )
 
 func parseTokenFlags() (error, int) {
-	fs := flag.NewFlagSet("token", flag.ExitOnError)
-	create := fs.Bool("create", false, "requests a token to be created on eserved")
-	fs.Parse(os.Args[2:])
+	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") {
+		cli.PrintUsage("epull token", []cli.Command{
+			{Name: "create", Description: "Creates a token on eserved"},
+		})
+		os.Exit(2)
+	}
 
 	err := admin.TryConnect()
 	if err != nil {
 		return fmt.Errorf("Can't connect, %w", err), 0
 	}
 
-	if *create {
+	switch os.Args[2] {
+	case "create":
 		token, err := admin.PostCreateToken()
 		if err != nil {
 			return fmt.Errorf("Couldn't create token, %w", err), 1
 		}
 		log.Println("New token:", token)
-		return nil, 0
 	}
 
 	return nil, 0
 }
 
 func parseStage() (error, int) {
-	if len(os.Args) < 3 {
+	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") {
 		cli.PrintUsage("epull stage", []cli.Command{
 			{Name: "download", Description: "Downloads a stage from the internet for eserved to use"},
 			{Name: "install", Description: "Installs a local stage for eserved to use"},
@@ -83,7 +87,7 @@ func parseStage() (error, int) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	if len(os.Args) < 2 || strings.Contains(os.Args[1], "help") {
 		cli.PrintUsage("epull", []cli.Command{
 			{Name: "token", Description: "Manage tokens used for registration"},
 			{Name: "stage", Description: "Manage stage3 files"},

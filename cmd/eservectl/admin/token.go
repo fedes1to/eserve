@@ -3,10 +3,12 @@ package admin
 import (
 	"fmt"
 	"io"
+
+	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
 func PostCreateToken() (string, error) {
-	response, err := adminClient.Post("http://unix/admin/v1/create_token", "", nil)
+	response, err := adminClient.Post(urls.SocketURL+urls.CreateTokenSuburl, "", nil)
 	if err != nil {
 		return "", err
 	}

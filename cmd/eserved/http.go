@@ -17,6 +17,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
 func requireClientCert(next http.Handler) http.Handler {
@@ -62,15 +63,15 @@ func serveHTTP(adminEnabled bool) error {
 
 	if adminEnabled {
 		adminMux := http.NewServeMux()
-		adminMux.HandleFunc("/admin/v1/create_token", admin.PostCreateToken)
+		adminMux.HandleFunc(urls.CreateTokenSuburl, admin.PostCreateToken)
 
-		os.Remove(admin.SocketPath)
-		unixSocket, err := net.Listen("unix", admin.SocketPath)
+		os.Remove(urls.SocketPath)
+		unixSocket, err := net.Listen("unix", urls.SocketPath)
 		if err != nil {
 			return err
 		}
 		defer unixSocket.Close()
-		os.Chmod(admin.SocketPath, 0600)
+		os.Chmod(urls.SocketPath, 0600)
 		adminServer := &http.Server{Handler: adminMux}
 
 		go func() {
@@ -88,9 +89,9 @@ func serveHTTP(adminEnabled bool) error {
 	}
 
 	apiMux := http.NewServeMux()
-	apiMux.HandleFunc("/api/v1/identity", api.PostIdentity)
-	apiMux.Handle("/api/v1/provision", requireClientCert(http.HandlerFunc(api.PostProvision)))
-	apiMux.Handle("/api/v1/stages", requireClientCert(http.HandlerFunc(api.GetStages)))
+	apiMux.HandleFunc(urls.IdentitySuburl, api.PostIdentity)
+	apiMux.Handle(urls.ProvisionSuburl, requireClientCert(http.HandlerFunc(api.PostProvision)))
+	apiMux.Handle(urls.StagesSuburl, requireClientCert(http.HandlerFunc(api.GetStages)))
 
 	apiServer := &http.Server{
 		Addr:      serverConfig.Settings.ListenAddr,

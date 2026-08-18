@@ -21,6 +21,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/sysinfo"
+	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
 func postIdentification(token string, server string, insecure bool) error {
@@ -61,7 +62,7 @@ func postIdentification(token string, server string, insecure bool) error {
 	payload := protocol.IdentificationRequest{Csr: string(csrPEM)}
 	body, _ := json.Marshal(payload)
 
-	request, _ := http.NewRequest("POST", server+"/api/v1/identity", bytes.NewReader(body))
+	request, _ := http.NewRequest("POST", server+urls.IdentitySuburl, bytes.NewReader(body))
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", "application/json")
 
@@ -156,7 +157,7 @@ func postProvisioning(flavor, stage string) error {
 	// construct JSON provisioning payload
 	payload := protocol.ProvisionRequest{GccMachine: gccMachine, Subarch: cpuSubarch, Profile: profile, Stagefile: stage, Flavor: flavor}
 	var provisionResponse protocol.ProvisionResponse
-	err = sendMtlsRequest("/api/v1/provision", payload, &provisionResponse)
+	err = sendMtlsRequest(urls.ProvisionSuburl, payload, &provisionResponse)
 	if err != nil {
 		return err
 	}
