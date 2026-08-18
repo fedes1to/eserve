@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
@@ -16,6 +17,7 @@ type MachineEntry struct {
 	Profile     chroot.Profile `json:"profile"`
 	Flavor      string         `json:"flavor"`
 	Fingerprint string         `json:"fingerprint"`
+	RevokedAt   time.Time      `json:"revoked_at"` // IsZero if not revoked
 }
 
 // we still address by tokens here, thats the GUID we will use internally
@@ -57,6 +59,21 @@ func loadMachinesLocked() error {
 	}
 
 	return nil
+}
+
+func RevokeMachine(cn string) error {
+	machinesMutex.Lock()
+	defer machinesMutex.Unlock()
+
+	machineEntry, exists := machines.Entries[cn]
+	if !exists {
+		return fmt.Errorf("Can't revoke non-existant machine %v", cn)
+	}
+
+	machineEntry.RevokedAt = time.Now()
+	machines.Entries[cn] = machineEntry
+
+	return saveMachinesLocked()
 }
 
 func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
@@ -107,5 +124,5 @@ func MachineCertValid(cn, fingerprint string) bool {
 	if !exists {
 		return false
 	}
-	return entry.Fingerprint != "" && entry.Fingerprint == fingerprint
+	return entry.Fingerprint != "" && entry.Fingerprint == fingerprint && entry.RevokedAt.IsZero()
 }

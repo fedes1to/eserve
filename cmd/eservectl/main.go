@@ -38,7 +38,7 @@ func parseTokenFlags() (error, int) {
 	return nil, 0
 }
 
-func parseStage() (error, int) {
+func parseStageFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") {
 		cli.PrintUsage("epull stage", []cli.Command{
 			{Name: "download", Description: "Downloads a stage from the internet for eserved to use"},
@@ -86,6 +86,36 @@ func parseStage() (error, int) {
 	return nil, 0
 }
 
+func parseMachineFlags() (error, int) {
+	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") {
+		cli.PrintUsage("epull machine", []cli.Command{
+			{Name: "revoke", Description: "Revokes a machine on eserved"},
+		})
+		os.Exit(2)
+	}
+
+	err := admin.TryConnect()
+	if err != nil {
+		return fmt.Errorf("Can't connect, %w", err), 0
+	}
+
+	switch os.Args[2] {
+	case "revoke":
+		fs := flag.NewFlagSet("machine revoke", flag.ExitOnError)
+		cn := fs.String("cn", "", "cn (usually hostname) of the machine to revoke")
+		fs.Parse(os.Args[3:])
+		if *cn == "" {
+			return fmt.Errorf("-cn flag is required"), 2
+		}
+		err := admin.PostRevokeMachine(*cn)
+		if err != nil {
+			return fmt.Errorf("Couldn't revoke machine, %w", err), 1
+		}
+	}
+
+	return nil, 0
+}
+
 func main() {
 	if len(os.Args) < 2 || strings.Contains(os.Args[1], "help") {
 		cli.PrintUsage("epull", []cli.Command{
@@ -102,7 +132,12 @@ func main() {
 			os.Exit(exitCode)
 		}
 	case "stage":
-		if err, exitCode := parseStage(); err != nil {
+		if err, exitCode := parseStageFlags(); err != nil {
+			fmt.Fprintln(os.Stderr, "Something went wrong,", err)
+			os.Exit(exitCode)
+		}
+	case "machine":
+		if err, exitCode := parseMachineFlags(); err != nil {
 			fmt.Fprintln(os.Stderr, "Something went wrong,", err)
 			os.Exit(exitCode)
 		}

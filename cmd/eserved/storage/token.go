@@ -88,8 +88,11 @@ func isTokenAvailableLocked(token string) bool {
 		return false
 	}
 
+	// a used token is one-shot: it must not be able to enroll a second machine.
+	// machines are keyed by CN (assigned on first use), so check the token's CN,
+	// not the token string itself
 	if tokenToCheck.CN != "" || !tokenToCheck.UsedAt.UTC().IsZero() {
-		if _, machineExists := machines.Entries[token]; machineExists {
+		if _, machineExists := machines.Entries[tokenToCheck.CN]; machineExists {
 			return false
 		}
 	}

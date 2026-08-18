@@ -64,6 +64,7 @@ func serveHTTP(adminEnabled bool) error {
 	if adminEnabled {
 		adminMux := http.NewServeMux()
 		adminMux.HandleFunc(urls.CreateTokenSuburl, admin.PostCreateToken)
+		adminMux.HandleFunc(urls.RevokeMachineSuburl, admin.PostRevokeMachine)
 
 		os.Remove(urls.SocketPath)
 		unixSocket, err := net.Listen("unix", urls.SocketPath)
