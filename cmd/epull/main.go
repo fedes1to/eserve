@@ -68,13 +68,13 @@ func main() {
 	case "register":
 		err, exitCode := parseRegister()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Registration went wrong,", err)
+			fmt.Fprintln(os.Stderr, "\x1b[31mRegistration went wrong,\x1b[0m", err)
 		}
 		os.Exit(exitCode)
 	case "provision":
 		err, exitCode := parseProvision()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Provision went wrong,", err)
+			fmt.Fprintln(os.Stderr, "\x1b[31mProvision went wrong,\x1b[0m", err)
 		}
 		os.Exit(exitCode)
 	}

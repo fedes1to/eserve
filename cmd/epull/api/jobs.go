@@ -16,64 +16,22 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
-func handleJobEvent(event protocol.StreamEvent) error {
-	// display line or turn terminal event into an error
-	switch event.Type {
-	case "progress", "output":
-		fmt.Println(event.Message)
-	case "error":
-		return fmt.Errorf("job failed: %s", event.Message)
-	case "cancelled":
-		return fmt.Errorf("job cancelled: %s", event.Message)
-	}
-	return nil
-}
-
-func readJobStream(body io.Reader) (err error) {
+func readJobStream(body io.Reader) error {
 	scanner := bufio.NewScanner(body)
-	eventType := ""
-	var dataLines []string
-
 	for scanner.Scan() {
 		line := scanner.Text()
+		fmt.Println(line)
 
-		switch {
-		case line == "":
-			if eventType == "" {
-				continue // stray blank line
-			}
-
-			// blank line ends the SSE event, parse and dispatch
-			payload := strings.Join(dataLines, "\n")
-			var event protocol.StreamEvent
-			if err := json.Unmarshal([]byte(payload), &event); err != nil {
-				return fmt.Errorf("couldn't decode stream event %q: %w", payload, err)
-			}
-
-			if event.Type == "done" {
-				return nil
-			}
-
-			if err := handleJobEvent(event); err != nil {
-				return err
-			}
-
-			eventType = ""
-			dataLines = nil
-
-		case strings.HasPrefix(line, "event:"):
-			eventType = strings.TrimSpace(strings.TrimPrefix(line, "event:")) // event name
-
-		case strings.HasPrefix(line, "data:"):
-			dataLines = append(dataLines,
-				strings.TrimSpace(strings.TrimPrefix(line, "data:"))) // JSON payload line
+		if strings.Contains(line, protocol.Red) { // red line means racc's job failed or was cancelled
+			return fmt.Errorf("racc's job ended with an error: %s",
+				strings.ReplaceAll(line, protocol.Red, ""))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	return fmt.Errorf("racc job stream ended without a terminal event")
+	return nil
 }
 
 func openJobStream(jobID string) (response *http.Response, err error) {

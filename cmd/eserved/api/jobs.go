@@ -77,7 +77,7 @@ func GetJobStream(w http.ResponseWriter, r *http.Request) {
 
 	job, ok := jobs.Registry.Get(jobRequest.JobID)
 	if !ok {
-		http.Error(w, "racc job not found", http.StatusNotFound)
+		http.Error(w, "racc's job not found", http.StatusNotFound)
 		return
 	}
 
@@ -120,24 +120,17 @@ func GetJobStream(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-job.Done():
-			return
-		case <-sub.Wait():
-			for _, event := range sub.Pop() {
-				writeEvent(w, flusher, event)
+		case event, ok := <-sub:
+			if !ok {
+				return // racc's job is over
 			}
+			writeEvent(w, flusher, event)
 		}
 	}
 }
 
 func writeEvent(w http.ResponseWriter, flusher http.Flusher, event protocol.StreamEvent) {
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return
-	}
-
-	fmt.Fprintf(w, "event: %s\n", event.Type)
-	fmt.Fprintf(w, "data: %s\n\n", payload)
+	fmt.Fprintln(w, protocol.Colorize(event))
 	flusher.Flush()
 }
 
@@ -150,7 +143,7 @@ func PostCancelJob(w http.ResponseWriter, r *http.Request) {
 
 	job, ok := jobs.Registry.Get(jobRequest.JobID)
 	if !ok {
-		http.Error(w, "racc job not found", http.StatusNotFound)
+		http.Error(w, "racc's job not found", http.StatusNotFound)
 		return
 	}
 
@@ -161,7 +154,7 @@ func PostCancelJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if job.IsFinished() {
-		http.Error(w, "racc job already finished", http.StatusConflict)
+		http.Error(w, "racc's job already finished", http.StatusConflict)
 		return
 	}
 

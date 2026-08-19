@@ -33,45 +33,17 @@ const (
 	maxLogLine      = 1 << 20
 )
 
-type subscriber struct {
-	mu     sync.Mutex
-	queue  []protocol.StreamEvent
-	notify chan struct{} // signals "drain me"
-}
-
-func (s *subscriber) push(event protocol.StreamEvent) {
-	s.mu.Lock()
-	s.queue = append(s.queue, event)
-	s.mu.Unlock()
-
-	select {
-	case s.notify <- struct{}{}:
-	default:
-	}
-}
-
-func (s *subscriber) Pop() (events []protocol.StreamEvent) {
-	s.mu.Lock()
-	events = s.queue
-	s.queue = nil
-	s.mu.Unlock()
-	return
-}
-
-func (s *subscriber) Wait() <-chan struct{} { return s.notify }
-
 type Job struct {
 	ID     string
 	CN     string
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	done chan struct{}
-
 	mu         sync.Mutex
 	state      State
 	logFile    *os.File
-	subs       map[*subscriber]struct{}
+	subs       map[chan protocol.StreamEvent]struct{}
+	terminal   *protocol.StreamEvent
 	finishedAt time.Time
 }
 
@@ -81,24 +53,21 @@ func (j *Job) logPath() string {
 
 func (j *Job) Write(event protocol.StreamEvent) {
 	j.mu.Lock()
+	defer j.mu.Unlock()
+
 	if j.state != StateRunning {
-		j.mu.Unlock()
 		return // too late, racc finished his job
 	}
 
-	// append to disk log, then fan out to live subscribers
 	if err := json.NewEncoder(j.logFile).Encode(event); err != nil {
-		log.Printf("racc job %s: couldn't append to log: %v", j.ID, err)
+		log.Printf("racc's job %s: couldn't append to log: %v", j.ID, err)
 	}
 
-	subscribers := make([]*subscriber, 0, len(j.subs))
 	for sub := range j.subs {
-		subscribers = append(subscribers, sub)
-	}
-	j.mu.Unlock()
-
-	for _, sub := range subscribers {
-		sub.push(event)
+		select {
+		case sub <- event:
+		default: // slow client, drop rather than stall the job
+		}
 	}
 }
 
@@ -112,45 +81,57 @@ func (j *Job) WriteOutput(message string) {
 
 func (j *Job) Finish(state State, terminal protocol.StreamEvent) {
 	j.mu.Lock()
+	defer j.mu.Unlock()
+
 	if j.state != StateRunning {
-		j.mu.Unlock()
 		return // gg
 	}
 	j.state = state
 	j.finishedAt = time.Now()
 
-	// terminal event goes to the log first, so late replays see it
+	// keep the terminal event, the log is gone after this
+	j.terminal = &terminal
+
 	if err := json.NewEncoder(j.logFile).Encode(terminal); err != nil {
-		log.Printf("racc job %s: couldn't append terminal event to log: %v", j.ID, err)
+		log.Printf("racc's job %s: couldn't append terminal event to log: %v", j.ID, err)
 	}
 	j.logFile.Close()
 
-	subscribers := make([]*subscriber, 0, len(j.subs))
-	for sub := range j.subs {
-		subscribers = append(subscribers, sub)
+	// delete the log, no point keeping it once racc's job is done
+	if err := os.Remove(j.logPath()); err != nil && !os.IsNotExist(err) {
+		log.Printf("racc's job %s: couldn't remove log file: %v", j.ID, err)
 	}
-	j.mu.Unlock()
 
-	for _, sub := range subscribers {
-		sub.push(terminal)
+	for sub := range j.subs {
+		select {
+		case sub <- terminal:
+		default:
+		}
+		close(sub) // tell stream handlers it's over
 	}
 
 	j.cancel()
-	close(j.done) // wake all stream handlers
 }
 
 // registers a subscriber and returns the log size, so callers can replay
 // whats already logged and only get new events live (no duplication)
-func (j *Job) Subscribe() (sub *subscriber, endOffset int64, err error) {
+func (j *Job) Subscribe() (sub chan protocol.StreamEvent, endOffset int64, err error) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
+
+	if j.state != StateRunning {
+		// job's over and the log is gone, replay handles the terminal event
+		sub = make(chan protocol.StreamEvent, 16)
+		close(sub)
+		return sub, 0, nil
+	}
 
 	info, err := j.logFile.Stat()
 	if err != nil {
 		return nil, 0, err
 	}
 
-	sub = &subscriber{notify: make(chan struct{}, 1)}
+	sub = make(chan protocol.StreamEvent, 16)
 	j.subs[sub] = struct{}{}
 	return sub, info.Size(), nil
 }
@@ -158,6 +139,13 @@ func (j *Job) Subscribe() (sub *subscriber, endOffset int64, err error) {
 func (j *Job) Replay(emit func(protocol.StreamEvent) error, endOffset int64) error {
 	file, err := os.Open(j.logPath())
 	if err != nil {
+		// log's already gone, replay the terminal event we kept
+		j.mu.Lock()
+		terminal := j.terminal
+		j.mu.Unlock()
+		if terminal != nil {
+			return emit(*terminal)
+		}
 		return err
 	}
 	defer file.Close()
@@ -176,7 +164,7 @@ func (j *Job) Replay(emit func(protocol.StreamEvent) error, endOffset int64) err
 	return scanner.Err()
 }
 
-func (j *Job) Unsubscribe(sub *subscriber) {
+func (j *Job) Unsubscribe(sub chan protocol.StreamEvent) {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	delete(j.subs, sub)
@@ -193,8 +181,6 @@ func (j *Job) IsFinished() bool {
 }
 
 func (j *Job) Cancel() { j.cancel() }
-
-func (j *Job) Done() <-chan struct{} { return j.done }
 
 type JobRegistry struct {
 	mu   sync.Mutex
@@ -227,10 +213,9 @@ func (r *JobRegistry) Start(cn string, work func(ctx context.Context, job *Job))
 		CN:      cn,
 		ctx:     ctx,
 		cancel:  cancel,
-		done:    make(chan struct{}),
 		state:   StateRunning,
 		logFile: logFile,
-		subs:    make(map[*subscriber]struct{}),
+		subs:    make(map[chan protocol.StreamEvent]struct{}),
 	}
 
 	r.mu.Lock()
@@ -250,7 +235,7 @@ func (r *JobRegistry) Start(cn string, work func(ctx context.Context, job *Job))
 	go func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				job.Finish(StateError, protocol.StreamEvent{Type: "error", Message: fmt.Sprintf("racc job panicked: %v", recovered)})
+				job.Finish(StateError, protocol.StreamEvent{Type: "error", Message: fmt.Sprintf("racc's job panicked: %v", recovered)})
 			}
 		}()
 		work(ctx, job)
@@ -272,8 +257,6 @@ func (r *JobRegistry) cleanup() {
 
 	for id, job := range r.jobs {
 		if job.IsFinished() && time.Since(job.finishedAt) > jobRetention {
-			job.logFile.Close()
-			os.Remove(job.logPath())
 			delete(r.jobs, id)
 		}
 	}
