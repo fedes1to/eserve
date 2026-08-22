@@ -79,6 +79,15 @@ func (j *Job) WriteOutput(message string) {
 	j.Write(protocol.StreamEvent{Type: "output", Message: message})
 }
 
+type JobWriter struct {
+	Job *Job
+}
+
+func (w *JobWriter) Write(p []byte) (int, error) {
+	w.Job.WriteOutput(string(p))
+	return len(p), nil
+}
+
 func (j *Job) Finish(state State, terminal protocol.StreamEvent) {
 	j.mu.Lock()
 	defer j.mu.Unlock()

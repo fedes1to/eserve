@@ -46,8 +46,8 @@ func Provision(ctx context.Context, job *jobs.Job, request protocol.ProvisionReq
 
 func extractStage3(ctx context.Context, job *jobs.Job, stagePath, dest string) error {
 	command := exec.CommandContext(ctx, "tar", "-xpf", stagePath, "-C", dest)
-	command.Stdout = &jobWriter{job: job}
-	command.Stderr = &jobWriter{job: job}
+	command.Stdout = &jobs.JobWriter{Job: job}
+	command.Stderr = &jobs.JobWriter{Job: job}
 
 	start := time.Now()
 	if err := command.Run(); err != nil {
@@ -55,13 +55,4 @@ func extractStage3(ctx context.Context, job *jobs.Job, stagePath, dest string) e
 	}
 	job.WriteOutput(fmt.Sprintf("extraction took %s", time.Since(start)))
 	return nil
-}
-
-type jobWriter struct {
-	job *jobs.Job
-}
-
-func (w *jobWriter) Write(p []byte) (int, error) {
-	w.job.WriteOutput(string(p))
-	return len(p), nil
 }

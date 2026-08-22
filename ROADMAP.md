@@ -6,9 +6,9 @@ Simple roadmap to check progress/features
 - mTLS security model
 - unix socket for eservectl model
 - token creation logic
+- /api/v1/provision
 
 ## TODO (atm)
-- /api/v1/provision
 - bubblewrap "bindings"
 - get started with the chroot stuff
 - almost everything cuh
