@@ -18,7 +18,7 @@ func Provision(ctx context.Context, job *jobs.Job, request protocol.ProvisionReq
 		return fmt.Errorf("invalid stagefile %q: must be a plain filename", request.Stagefile)
 	}
 
-	chrootDir := filepath.Join(serverConfig.Settings.ChrootBase, job.CN)
+	chrootDir := filepath.Join(serverConfig.Settings.ChrootBase, request.Flavor)
 
 	stagePath := filepath.Join(serverConfig.Settings.StagePath, request.Stagefile)
 	if _, err := os.Stat(stagePath); err != nil {

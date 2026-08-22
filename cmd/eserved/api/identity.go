@@ -76,7 +76,7 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if err := storage.UseToken(token, csr.Subject.CommonName, identificationRequest.Flavor); err != nil {
+	if err := storage.UseToken(token, csr.Subject.CommonName); err != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}

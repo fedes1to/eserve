@@ -14,7 +14,6 @@ import (
 // these are pretty much only for logging the tokens and registering
 type TokenEntry struct {
 	CN        string    `json:"cn"`
-	Flavor    string    `json:"flavor"`
 	CreatedAt time.Time `json:"created"`
 	UsedAt    time.Time `json:"used"`
 }
@@ -100,14 +99,6 @@ func isTokenAvailableLocked(token string) bool {
 	return true
 }
 
-func TokenFlavor(token string) (string, bool) {
-	tokensMutex.RLock()
-	defer tokensMutex.RUnlock()
-
-	entry, exists := tokens.Entries[token]
-	return entry.Flavor, exists
-}
-
 func ValidCN(token string, cn string) bool {
 	tokensMutex.RLock()
 	defer tokensMutex.RUnlock()
@@ -124,7 +115,7 @@ func ValidCN(token string, cn string) bool {
 	return true
 }
 
-func UseToken(token string, cn string, flavor string) error {
+func UseToken(token string, cn string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
@@ -133,8 +124,10 @@ func UseToken(token string, cn string, flavor string) error {
 	}
 
 	tokenToUse := tokens.Entries[token]
+	if tokenToUse.CN != "" && tokenToUse.CN != cn {
+		return fmt.Errorf("token not valid for machine")
+	}
 	tokenToUse.CN = cn
-	tokenToUse.Flavor = flavor
 	tokenToUse.UsedAt = time.Now()
 	tokens.Entries[token] = tokenToUse
 

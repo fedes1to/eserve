@@ -31,19 +31,12 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	if provisionRequest.Flavor == "" {
 		provisionRequest.Flavor = machineFlavor
 	}
+
+	token := ""
 	if machineFlavor != provisionRequest.Flavor {
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !storage.IsTokenAvailable(token) {
 			http.Error(w, "new token required for flavor", http.StatusUnauthorized)
-			return
-		}
-		tokenFlavor, _ := storage.TokenFlavor(token)
-		if tokenFlavor != "" && tokenFlavor != provisionRequest.Flavor {
-			http.Error(w, "token not valid for flavor", http.StatusForbidden)
-			return
-		}
-		if err := storage.UseToken(token, identity.CN, provisionRequest.Flavor); err != nil {
-			http.Error(w, "couldn't use token", http.StatusInternalServerError)
 			return
 		}
 	}
@@ -53,7 +46,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job, err := jobs.Registry.Start(identity.CN, func(ctx context.Context, job *jobs.Job) {
-		ProvisionJob(ctx, job, provisionRequest)
+		ProvisionJob(ctx, job, provisionRequest, token)
 	})
 	if err != nil {
 		log.Printf("%v: racc failed to start provision job: %v\n", ClientIP(r), err)
@@ -71,7 +64,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest) {
+func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, token string) {
 	job.WriteProgress("starting provision")
 
 	if err := chroot.Provision(ctx, job, request); err != nil {
@@ -83,6 +76,13 @@ func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.Provision
 		job.CN, request.Subarch, request.GccMachine, request.Profile, request.Flavor); err != nil {
 		job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
 		return
+	}
+
+	if token != "" {
+		if err := storage.UseToken(token, job.CN); err != nil {
+			job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
+			return
+		}
 	}
 
 	job.Finish(jobs.StateDone, protocol.StreamEvent{Type: "done", Message: "provision complete"})
