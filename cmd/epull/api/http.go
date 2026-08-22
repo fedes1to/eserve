@@ -12,9 +12,16 @@ import (
 var mtlsClient *http.Client
 
 func sendMtlsRequest[T any](subUrl string, payload any, into *T, expectedStatus ...int) error {
+	return sendMtlsRequestWithToken(subUrl, payload, "", into, expectedStatus...)
+}
+
+func sendMtlsRequestWithToken[T any](subUrl string, payload any, token string, into *T, expectedStatus ...int) error {
 	body, _ := json.Marshal(payload)
 	request, _ := http.NewRequest("POST", clientConfig.Settings.Server+subUrl, bytes.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
 
 	return sendRequest(request, into, mtlsClient, expectedStatus...)
 }

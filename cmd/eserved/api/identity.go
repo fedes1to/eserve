@@ -30,6 +30,10 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	if identificationRequest.Flavor == "" {
+		http.Error(w, "flavor required", http.StatusBadRequest)
+		return
+	}
 
 	block, _ := pem.Decode([]byte(identificationRequest.Csr))
 	if block == nil {
@@ -72,13 +76,13 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		ValidUntil:  template.NotAfter.UTC().Format(time.RFC3339),
 	}
 
-	if err := storage.UseToken(token, csr.Subject.CommonName); err != nil {
+	if err := storage.UseToken(token, csr.Subject.CommonName, identificationRequest.Flavor); err != nil {
 		http.Error(w, "couldn't use token", http.StatusInternalServerError)
 		return
 	}
 
 	fingerprint := sha256.Sum256(certificate)
-	if err := storage.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:])); err != nil {
+	if err := storage.UpsertMachine(csr.Subject.CommonName, hex.EncodeToString(fingerprint[:]), identificationRequest.Flavor); err != nil {
 		http.Error(w, "couldn't upsert machine", http.StatusInternalServerError)
 		return
 	}

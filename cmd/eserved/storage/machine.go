@@ -99,6 +99,14 @@ func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
 	return saveMachinesLocked()
 }
 
+func MachineFlavor(cn string) (string, bool) {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	entry, exists := machines.Entries[cn]
+	return entry.Flavor, exists
+}
+
 func MachineExists(cn string) bool {
 	machinesMutex.RLock()
 	defer machinesMutex.RUnlock()
@@ -114,13 +122,13 @@ func IsMachineCrossdev(cn string) bool {
 	return machines.Entries[cn].Profile.IsCrossdev()
 }
 
-func UpsertMachine(cn, fingerprint string) error {
+func UpsertMachine(cn, fingerprint, flavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
-	entry := MachineEntry{
-		Fingerprint: fingerprint,
-	}
+	entry := machines.Entries[cn]
+	entry.Fingerprint = fingerprint
+	entry.Flavor = flavor
 	machines.Entries[cn] = entry
 	return saveMachinesLocked()
 }

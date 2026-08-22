@@ -32,7 +32,8 @@ func parseRegister() (error, int) {
 
 func parseProvision() (error, int) {
 	fs := flag.NewFlagSet("provision", flag.ExitOnError)
-	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
+	flavor := fs.String("flavor", "", "Flavor name used on provisioning, empty uses previous flavor")
+	token := fs.String("token", "", "Token required when switching flavor")
 	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 	stage := fs.String("stage", "", "Stage3 file used on provisioning")
 	fs.Parse(os.Args[2:])
@@ -52,7 +53,7 @@ func parseProvision() (error, int) {
 		}
 	}
 
-	return api.HandleProvision(*flavor, *stage)
+	return api.HandleProvision(*flavor, *stage, *token)
 }
 
 func main() {

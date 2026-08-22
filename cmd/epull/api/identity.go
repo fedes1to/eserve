@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-func postIdentification(token string, server string, insecure bool) error {
+func postIdentification(token string, server string, flavor string, insecure bool) error {
 	// making the certs and CSR
 	_, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -57,7 +57,7 @@ func postIdentification(token string, server string, insecure bool) error {
 	} else {
 		client = http.DefaultClient
 	}
-	payload := protocol.IdentificationRequest{Csr: string(csrPEM)}
+	payload := protocol.IdentificationRequest{Csr: string(csrPEM), Flavor: flavor}
 	body, _ := json.Marshal(payload)
 
 	request, _ := http.NewRequest("POST", server+urls.IdentitySuburl, bytes.NewReader(body))
@@ -143,7 +143,7 @@ func HandleRegistration(token, server, flavor string, insecure bool) (error, int
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
 	err, exitCode := cli.MustRegister([]cli.InitStep{
-		{Name: "identity", Function: func() error { return postIdentification(token, server, insecure) }},
+		{Name: "identity", Function: func() error { return postIdentification(token, server, flavor, insecure) }},
 		{Name: "mtls client", Function: func() error { return InitializeMtlsClient(insecure) }},
 	})
 	if err != nil {
@@ -155,6 +155,6 @@ func HandleRegistration(token, server, flavor string, insecure bool) (error, int
 		return err, 1
 	}
 	return cli.MustRegister([]cli.InitStep{
-		{Name: "provision", Function: func() error { return postProvisioning(flavor, stage) }}})
+		{Name: "provision", Function: func() error { return postProvisioning(flavor, stage, token) }}})
 
 }

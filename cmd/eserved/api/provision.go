@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
@@ -25,6 +26,26 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	if !storage.MachineExists(identity.CN) {
 		http.Error(w, "machine not registered, run identity first", http.StatusBadRequest)
 		return
+	}
+	machineFlavor, _ := storage.MachineFlavor(identity.CN)
+	if provisionRequest.Flavor == "" {
+		provisionRequest.Flavor = machineFlavor
+	}
+	if machineFlavor != provisionRequest.Flavor {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if !storage.IsTokenAvailable(token) {
+			http.Error(w, "new token required for flavor", http.StatusUnauthorized)
+			return
+		}
+		tokenFlavor, _ := storage.TokenFlavor(token)
+		if tokenFlavor != "" && tokenFlavor != provisionRequest.Flavor {
+			http.Error(w, "token not valid for flavor", http.StatusForbidden)
+			return
+		}
+		if err := storage.UseToken(token, identity.CN, provisionRequest.Flavor); err != nil {
+			http.Error(w, "couldn't use token", http.StatusInternalServerError)
+			return
+		}
 	}
 	if chroot.IsGccMachineDiff(provisionRequest.GccMachine) {
 		http.Error(w, "crossdev not supported, choose same arch as eserved", http.StatusBadRequest)
