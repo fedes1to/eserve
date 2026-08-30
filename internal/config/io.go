@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 )
 
@@ -40,7 +41,7 @@ func LoadJsonFile[T any](path string, into *T) error {
 	defer jsonFile.Close()
 
 	decoder := json.NewDecoder(jsonFile)
-	if err := decoder.Decode(into); err != nil {
+	if err := decoder.Decode(into); err != nil && !errors.Is(err, io.EOF) {
 		return err
 	}
 	return nil

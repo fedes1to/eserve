@@ -47,6 +47,9 @@ func LoadCaCertificate() error {
 		return err
 	}
 	pemBlock, _ := pem.Decode(CaCertificatePEM)
+	if pemBlock == nil {
+		return fmt.Errorf("no CA certificate parsed from %s", caCertificatePath)
+	}
 
 	CaCertificate, err = x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
@@ -59,6 +62,9 @@ func LoadCaCertificate() error {
 	}
 
 	keyBlock, _ := pem.Decode(keyPEM)
+	if keyBlock == nil {
+		return fmt.Errorf("no CA key parsed from %s", caKeyPath)
+	}
 	CaKey, err = x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
 	if err != nil {
 		return err

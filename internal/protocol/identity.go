@@ -22,4 +22,5 @@ type ProvisionRequest struct {
 type ProvisionResponse struct {
 	JobID      string `json:"job_id"`
 	BinhostURL string `json:"binhost_url"`
+	Flavor     string `json:"flavor"`
 }

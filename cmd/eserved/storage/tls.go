@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"time"
 
@@ -20,8 +21,8 @@ var TlsCertificate tls.Certificate
 
 func LoadTlsCertificates() error {
 	if _, err := os.Stat(serverConfig.Settings.TlsCertPath); errors.Is(err, os.ErrNotExist) {
-		log.Println("no server cert found, generating self-signed cert")
-		if err := generateSelfSigned(); err != nil {
+		log.Println("no server cert found, generating one signed by the eserved CA")
+		if err := generateServerCert(); err != nil {
 			return err
 		}
 	} else if err != nil {
@@ -36,7 +37,12 @@ func LoadTlsCertificates() error {
 	return nil
 }
 
-func generateSelfSigned() error {
+// signed by the eserved CA so plain https clients (like portage) can
+// verify it; SANs cover whatever address clients reach us on
+func generateServerCert() error {
+	if CaCertificate == nil || CaKey == nil {
+		return fmt.Errorf("CA not loaded, can't sign the server cert")
+	}
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err
@@ -49,9 +55,11 @@ func generateSelfSigned() error {
 		NotAfter:     time.Now().AddDate(1, 0, 0), // 1 year
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		DNSNames:     []string{"eserver"},
+		IPAddresses:  serverIPs(),
 	}
 
-	certificate, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	certificate, err := x509.CreateCertificate(rand.Reader, template, CaCertificate, publicKey, CaKey)
 	if err != nil {
 		return err
 	}
@@ -67,4 +75,28 @@ func generateSelfSigned() error {
 	}
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 	return os.WriteFile(serverConfig.Settings.TlsKeyPath, keyPEM, 0600)
+}
+
+// loopback plus every non-loopback ipv4 up on this host
+func serverIPs() []net.IP {
+	ips := []net.IP{net.ParseIP("127.0.0.1")}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ips
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+				ips = append(ips, ipnet.IP)
+			}
+		}
+	}
+	return ips
 }

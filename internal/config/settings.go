@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path/filepath"
 )
 
 // hardcoding go brrr i guess
@@ -22,4 +23,9 @@ func InitConfigPath(path string) string {
 		log.Fatalln("Invalid config path, please check", path)
 	}
 	return path // can be safely ignored, its just for convenience
+}
+
+// a flavor's portage config: a plain dir of portage config files
+func FlavorConfigDir(flavor string) string {
+	return filepath.Join(ServerConfigPath, "flavors", flavor)
 }

@@ -1,4 +1,4 @@
-package api
+package admin
 
 import (
 	"encoding/json"
@@ -8,30 +8,12 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
-func GetJobStream(w http.ResponseWriter, r *http.Request) {
-	var jobRequest protocol.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
-		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
-		return
-	}
-
-	job, ok := jobs.Registry.Get(jobRequest.JobID)
-	if !ok {
-		http.Error(w, "racc's job not found", http.StatusNotFound)
-		return
-	}
-
-	identity := r.Context().Value(CtxKeyIdentity).(ClientIdentity)
-	if job.CN != identity.CN {
-		http.Error(w, "racc not your job", http.StatusForbidden)
-		return
-	}
-
-	// a client that goes away mid-stream is nothing to do about
-	_ = job.Stream(w, r.Context().Done())
+func PostListJobs(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(protocol.JobListResponse{Jobs: jobs.Registry.List()})
 }
 
-func PostCancelJob(w http.ResponseWriter, r *http.Request) {
+func PostAdminCancelJob(w http.ResponseWriter, r *http.Request) {
 	var jobRequest protocol.JobRequest
 	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
 		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
@@ -41,12 +23,6 @@ func PostCancelJob(w http.ResponseWriter, r *http.Request) {
 	job, ok := jobs.Registry.Get(jobRequest.JobID)
 	if !ok {
 		http.Error(w, "racc's job not found", http.StatusNotFound)
-		return
-	}
-
-	identity := r.Context().Value(CtxKeyIdentity).(ClientIdentity)
-	if job.CN != identity.CN {
-		http.Error(w, "racc not your job", http.StatusForbidden)
 		return
 	}
 
@@ -56,7 +32,24 @@ func PostCancelJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job.Cancel()
-	job.Finish(jobs.StateCancelled, protocol.StreamEvent{Type: "cancelled", Message: "cancelled by client"})
+	job.Finish(jobs.StateCancelled, protocol.StreamEvent{Type: "cancelled", Message: "cancelled by admin"})
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func PostAdminJobStream(w http.ResponseWriter, r *http.Request) {
+	var jobRequest protocol.JobRequest
+	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
+		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
+		return
+	}
+
+	job, ok := jobs.Registry.Get(jobRequest.JobID)
+	if !ok {
+		http.Error(w, "racc's job not found", http.StatusNotFound)
+		return
+	}
+
+	// no request context to watch here, a nil cancel channel never fires
+	_ = job.Stream(w, nil)
 }

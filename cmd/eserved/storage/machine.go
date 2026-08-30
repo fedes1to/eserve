@@ -3,12 +3,15 @@ package storage
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 type MachineEntry struct {
@@ -94,6 +97,7 @@ func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
 		Profile:     chroot.Profile{Full: profile, GccMachine: gccMachine},
 		Flavor:      flavor,
 		Fingerprint: upsertedEntry.Fingerprint,
+		RevokedAt:   upsertedEntry.RevokedAt, // revocation is sticky, a re-provision doesnt clear it
 	}
 	machines.Entries[cn] = entry
 	return saveMachinesLocked()
@@ -141,4 +145,24 @@ func MachineCertValid(cn, fingerprint string) bool {
 		return false
 	}
 	return entry.Fingerprint != "" && entry.Fingerprint == fingerprint && entry.RevokedAt.IsZero()
+}
+
+// returns the registered machines, sorted by cn
+func ListMachines() []protocol.MachineInfo {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	list := make([]protocol.MachineInfo, 0, len(machines.Entries))
+	for cn, entry := range machines.Entries {
+		list = append(list, protocol.MachineInfo{
+			CN:          cn,
+			Subarch:     entry.Subarch,
+			Profile:     entry.Profile.Full,
+			Flavor:      entry.Flavor,
+			Fingerprint: entry.Fingerprint,
+			RevokedAt:   entry.RevokedAt,
+		})
+	}
+	slices.SortFunc(list, func(a, b protocol.MachineInfo) int { return strings.Compare(a.CN, b.CN) })
+	return list
 }

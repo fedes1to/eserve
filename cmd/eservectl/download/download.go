@@ -97,6 +97,7 @@ func DownloadFile(url string, dest string) (string, error) {
 	total := int64(0)
 	if resp, err := http.Head(url); err == nil {
 		total = resp.ContentLength
+		resp.Body.Close()
 	}
 
 	done := make(chan int64)
@@ -104,11 +105,17 @@ func DownloadFile(url string, dest string) (string, error) {
 
 	resp, err := http.Get(url)
 	if err != nil {
+		os.Remove(fullPath)
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		os.Remove(fullPath)
+		return "", fmt.Errorf("download failed, code %v", resp.StatusCode)
+	}
 	n, err := io.Copy(out, resp.Body)
 	if err != nil {
+		os.Remove(fullPath)
 		return "", err
 	}
 

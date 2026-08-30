@@ -31,3 +31,20 @@ func PostRevokeMachine(cn string) error {
 
 	return nil
 }
+
+func PostListMachines() ([]protocol.MachineInfo, error) {
+	response, err := adminClient.Post(urls.SocketURL+urls.MachinesListSuburl, "", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var list protocol.MachineListResponse
+	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("couldn't list machines, code %v", response.StatusCode)
+	}
+	return list.Machines, nil
+}

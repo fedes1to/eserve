@@ -9,7 +9,7 @@ type StreamEvent struct {
 	Message string `json:"message,omitempty"`
 }
 
-// ANSI colors convey the event type on the wire, shared by eserved and epull
+// ANSI colors for display; epull colorizes events itself, the wire carries none
 const (
 	Reset = "\x1b[0m"
 	Cyan  = "\x1b[36m"
@@ -30,7 +30,6 @@ func Color(eventType string) string {
 	return ""
 }
 
-// Colorize renders an event as the plaintext line sent over the wire
 func Colorize(event StreamEvent) string {
 	if color := Color(event.Type); color != "" {
 		return color + event.Message + Reset

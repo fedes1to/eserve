@@ -5,49 +5,33 @@ import (
 	"bytes"
 	"compress/gzip"
 	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
+	"git.fedesito.me/fedes1to/eserve/cmd/epull/storage"
+	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
-const portageConfigRoot = "/etc/portage"
-
-var portageSyncPaths = []string{
-	"make.conf",
-	"package.use",
-	"package.accept_keywords",
-	"package.mask",
-	"package.unmask",
-	"package.license",
-	"package.properties",
-	"package.env",
-	"env",
-	"sets",
-	"savedconfig",
-	"patches",
-	"repos.conf",
-	"binrepos.conf",
-}
-
-func SyncPortage() (fingerprint string, archive io.Reader, err error) {
+// stable across runs: mtimes and ownership are normalized, missing paths skipped
+func SyncPortage() (fingerprint string, archive []byte, err error) {
 	var archiveData bytes.Buffer
-	var manifest bytes.Buffer
 	gzipWriter := gzip.NewWriter(&archiveData)
 	tarWriter := tar.NewWriter(gzipWriter)
+	manifest := protocol.NewPortageManifest()
 
-	paths := append([]string(nil), portageSyncPaths...)
+	paths := append([]string(nil), protocol.PortageSyncPaths...)
 	sort.Strings(paths)
 	for _, relativePath := range paths {
-		if err := writePortagePath(tarWriter, &manifest, relativePath); err != nil {
-			tarWriter.Close()
-			gzipWriter.Close()
+		if err := writePortagePath(tarWriter, manifest, relativePath); err != nil {
 			return "", nil, err
 		}
 	}
@@ -58,47 +42,42 @@ func SyncPortage() (fingerprint string, archive io.Reader, err error) {
 		return "", nil, err
 	}
 
-	digest := sha256.Sum256(manifest.Bytes())
-	return hex.EncodeToString(digest[:]), bytes.NewReader(archiveData.Bytes()), nil
+	return manifest.Fingerprint(), archiveData.Bytes(), nil
 }
 
-func CheckSync() (bool, error) {
-	fingerprint, _, err := SyncPortage()
-	if err != nil {
-		return false, err
-	}
-
+func CheckSync(fingerprint string) (inSync bool, check protocol.SyncCheckResponse, err error) {
 	request, err := http.NewRequest("POST", clientConfig.Settings.Server+urls.CheckSyncSuburl, nil)
 	if err != nil {
-		return false, err
+		return false, check, err
 	}
 	request.Header.Set("X-Portage-Fingerprint", fingerprint)
+
 	response, err := mtlsClient.Do(request)
 	if err != nil {
-		return false, err
+		return false, check, err
 	}
 	defer response.Body.Close()
+
 	if response.StatusCode == http.StatusNoContent {
-		return true, nil
+		return true, check, nil
 	}
 	if response.StatusCode == http.StatusConflict {
-		return false, nil
+		if err := json.NewDecoder(response.Body).Decode(&check); err != nil {
+			return false, check, fmt.Errorf("couldn't decode sync check response: %w", err)
+		}
+		return false, check, nil
 	}
 	body, _ := io.ReadAll(response.Body)
-	return false, fmt.Errorf("couldn't check portage config, code %v, body: %s", response.StatusCode, string(body))
+	return false, check, fmt.Errorf("couldn't check portage config, code %v, body: %s", response.StatusCode, string(body))
 }
 
-func UploadPortage() error {
-	_, archive, err := SyncPortage()
-	if err != nil {
-		return err
-	}
-
-	request, err := http.NewRequest("POST", clientConfig.Settings.Server+urls.SyncSuburl, archive)
+func UploadPortage(fingerprint string, archive []byte) error {
+	request, err := http.NewRequest("POST", clientConfig.Settings.Server+urls.SyncSuburl, bytes.NewReader(archive))
 	if err != nil {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/gzip")
+	request.Header.Set("X-Portage-Fingerprint", fingerprint)
 
 	response, err := mtlsClient.Do(request)
 	if err != nil {
@@ -112,8 +91,57 @@ func UploadPortage() error {
 	return nil
 }
 
-func writePortagePath(writer *tar.Writer, manifest io.Writer, relativePath string) error {
-	path := filepath.Join(portageConfigRoot, relativePath)
+func stdinIsTerminal() bool {
+	stat, err := os.Stdin.Stat()
+	return err == nil && stat.Mode()&os.ModeCharDevice != 0
+}
+
+func runSync(assumeYes bool) error {
+	fingerprint, archive, err := SyncPortage()
+	if err != nil {
+		return fmt.Errorf("couldn't read portage config: %w", err)
+	}
+
+	inSync, check, err := CheckSync(fingerprint)
+	if err != nil {
+		return err
+	}
+	if inSync {
+		log.Println("portage config is in sync with the server")
+		return nil
+	}
+
+	if !assumeYes {
+		if !stdinIsTerminal() {
+			return fmt.Errorf("portage config differs from flavor %q and no terminal is available, run 'epull sync -y'", check.Flavor)
+		}
+		fmt.Printf("flavor %q on the server is out of sync with your portage config, sync it now? [y/N] ", check.Flavor)
+		answer := ""
+		if _, err := fmt.Scanln(&answer); err != nil {
+			return fmt.Errorf("invalid input: %w, run 'epull sync -y' to sync without prompting", err)
+		}
+		if answer != "y" && answer != "yes" {
+			log.Println("skipping portage sync")
+			return nil
+		}
+	}
+
+	if err := UploadPortage(fingerprint, archive); err != nil {
+		return err
+	}
+	log.Println("portage config synced")
+	return nil
+}
+
+func HandleSync(assumeYes, insecure bool) (error, int) {
+	return cli.MustRegister([]cli.InitStep{
+		{Name: "mtls client", Function: func() error { return InitializeMtlsClient(insecure) }},
+		{Name: "portage sync", Function: func() error { return runSync(assumeYes) }},
+	})
+}
+
+func writePortagePath(writer *tar.Writer, manifest *protocol.PortageManifest, relativePath string) error {
+	path := filepath.Join(storage.PortageConfigRoot, relativePath)
 	info, err := os.Lstat(path)
 	if os.IsNotExist(err) {
 		return nil
@@ -124,29 +152,30 @@ func writePortagePath(writer *tar.Writer, manifest io.Writer, relativePath strin
 	return writePortageEntry(writer, manifest, path, relativePath, info)
 }
 
-func writePortageEntry(writer *tar.Writer, manifest io.Writer, path, relativePath string, info os.FileInfo) error {
-	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() && !info.IsDir() {
+// portage loves symlinks (profile -> /usr/portage/profile/...), follow them into the archive
+func writePortageEntry(writer *tar.Writer, manifest *protocol.PortageManifest, path, relativePath string, info os.FileInfo) error {
+	if info.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Stat(path)
+		if err != nil {
+			return fmt.Errorf("dangling symlink in portage config: %s", relativePath)
+		}
+		info = resolved
+	}
+	if !info.Mode().IsRegular() && !info.IsDir() {
 		return fmt.Errorf("unsupported portage config entry: %s", relativePath)
 	}
 
+	var data []byte
 	if info.IsDir() {
-		if _, err := fmt.Fprintf(manifest, "%s\tdirectory\n", filepath.ToSlash(relativePath)); err != nil {
-			return err
-		}
+		manifest.AddDirectory(relativePath)
 	} else {
-		file, err := os.Open(path)
+		var err error
+		data, err = os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		fileDigest := sha256.New()
-		if _, err := io.Copy(fileDigest, file); err != nil {
-			file.Close()
-			return err
-		}
-		file.Close()
-		if _, err := fmt.Fprintf(manifest, "%s\tfile\t%d\t%s\n", filepath.ToSlash(relativePath), info.Size(), hex.EncodeToString(fileDigest.Sum(nil))); err != nil {
-			return err
-		}
+		sum := sha256.Sum256(data)
+		manifest.AddFile(relativePath, int64(len(data)), sum[:])
 	}
 
 	header, err := tar.FileInfoHeader(info, "")
@@ -174,10 +203,9 @@ func writePortageEntry(writer *tar.Writer, manifest io.Writer, path, relativePat
 		if err != nil {
 			return err
 		}
-		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 		for _, entry := range entries {
 			childRelative := filepath.Join(relativePath, entry.Name())
-			childPath := filepath.Join(portageConfigRoot, childRelative)
+			childPath := filepath.Join(storage.PortageConfigRoot, childRelative)
 			childInfo, err := os.Lstat(childPath)
 			if err != nil {
 				return err
@@ -189,11 +217,6 @@ func writePortageEntry(writer *tar.Writer, manifest io.Writer, path, relativePat
 		return nil
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	_, err = io.Copy(writer, file)
+	_, err = writer.Write(data)
 	return err
 }

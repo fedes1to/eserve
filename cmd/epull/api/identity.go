@@ -35,10 +35,10 @@ func postIdentification(token string, server string, flavor string, insecure boo
 		Subject: pkix.Name{CommonName: hostname},
 	}
 	csrDER, err := x509.CreateCertificateRequest(rand.Reader, csrTemplate, privKey)
-	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
 	if err != nil {
 		return err
 	}
+	csrPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE REQUEST", Bytes: csrDER})
 
 	keyDER, _ := x509.MarshalPKCS8PrivateKey(privKey)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
@@ -60,7 +60,10 @@ func postIdentification(token string, server string, flavor string, insecure boo
 	payload := protocol.IdentificationRequest{Csr: string(csrPEM), Flavor: flavor}
 	body, _ := json.Marshal(payload)
 
-	request, _ := http.NewRequest("POST", server+urls.IdentitySuburl, bytes.NewReader(body))
+	request, err := http.NewRequest("POST", server+urls.IdentitySuburl, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
 	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", "application/json")
 

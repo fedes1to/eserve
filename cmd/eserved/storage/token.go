@@ -4,11 +4,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 // these are pretty much only for logging the tokens and registering
@@ -88,11 +91,12 @@ func isTokenAvailableLocked(token string) bool {
 		return false
 	}
 
-	// a used token is one-shot: it must not be able to enroll a second machine.
-	// machines are keyed by CN (assigned on first use), so check the token's CN,
-	// not the token string itself
+	// a used token is one-shot: if its CN is already enrolled, its spent
 	if tokenToCheck.CN != "" || !tokenToCheck.UsedAt.UTC().IsZero() {
-		if _, machineExists := machines.Entries[tokenToCheck.CN]; machineExists {
+		machinesMutex.RLock()
+		_, machineExists := machines.Entries[tokenToCheck.CN]
+		machinesMutex.RUnlock()
+		if machineExists {
 			return false
 		}
 	}
@@ -132,4 +136,31 @@ func UseToken(token string, cn string) error {
 	tokens.Entries[token] = tokenToUse
 
 	return saveTokensLocked()
+}
+
+// returns the tokens, oldest first
+func ListTokens() []protocol.TokenInfo {
+	tokensMutex.RLock()
+	defer tokensMutex.RUnlock()
+
+	list := make([]protocol.TokenInfo, 0, len(tokens.Entries))
+	for token, entry := range tokens.Entries {
+		list = append(list, protocol.TokenInfo{
+			Token:     token,
+			CN:        entry.CN,
+			CreatedAt: entry.CreatedAt,
+			UsedAt:    entry.UsedAt,
+		})
+	}
+	slices.SortFunc(list, func(a, b protocol.TokenInfo) int {
+		switch {
+		case a.CreatedAt.Before(b.CreatedAt):
+			return -1
+		case a.CreatedAt.After(b.CreatedAt):
+			return 1
+		default:
+			return strings.Compare(a.Token, b.Token)
+		}
+	})
+	return list
 }

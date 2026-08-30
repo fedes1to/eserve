@@ -34,14 +34,18 @@ func AskStagefile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if stagesString == "" {
+
+	var stages []string
+	for _, stage := range strings.Split(stagesString, "\n") {
+		if stage != "" {
+			stages = append(stages, stage)
+		}
+	}
+	if len(stages) == 0 {
 		return "", fmt.Errorf("Server has no stages, please download one first")
 	}
-	stages := strings.Split(stagesString, "\n")
 	for i, stage := range stages {
-		if stage != "" {
-			fmt.Printf("[%v] %v\n", i+1, stage)
-		}
+		fmt.Printf("[%v] %v\n", i+1, stage)
 	}
 	fmt.Print("Select your stage: ")
 	var stageIndex int

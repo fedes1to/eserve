@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
@@ -25,4 +27,21 @@ func PostCreateToken() (string, error) {
 	}
 
 	return bodyString, nil
+}
+
+func PostListTokens() ([]protocol.TokenInfo, error) {
+	response, err := adminClient.Post(urls.SocketURL+urls.TokensListSuburl, "", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	var list protocol.TokenListResponse
+	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("couldn't list tokens, code %v", response.StatusCode)
+	}
+	return list.Tokens, nil
 }

@@ -2,11 +2,13 @@ package admin
 
 // used for eservectl comms
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 func PostCreateToken(w http.ResponseWriter, r *http.Request) {
@@ -20,4 +22,9 @@ func PostCreateToken(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprint(w, token)
+}
+
+func PostListTokens(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(protocol.TokenListResponse{Tokens: storage.ListTokens()})
 }

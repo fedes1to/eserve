@@ -27,3 +27,8 @@ func PostRevokeMachine(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprint(w, "ok")
 }
+
+func PostListMachines(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(protocol.MachineListResponse{Machines: storage.ListMachines()})
+}

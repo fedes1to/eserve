@@ -10,9 +10,9 @@ type ClientIdentity struct {
 	Fingerprint string
 }
 
-const (
-	CtxKeyIdentity = "client_identity"
-)
+type ctxKey string
+
+const CtxKeyIdentity ctxKey = "client_identity"
 
 func ClientIP(r *http.Request) string {
 	proxyIpHeader := r.Header.Get("X-Forwarded-For")

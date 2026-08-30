@@ -56,11 +56,44 @@ func parseProvision() (error, int) {
 	return api.HandleProvision(*flavor, *stage, *token)
 }
 
+func parseSync() (error, int) {
+	fs := flag.NewFlagSet("sync", flag.ExitOnError)
+	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
+	assumeYes := fs.Bool("y", false, "Sync without prompting when out of date")
+	fs.Parse(os.Args[2:])
+
+	if err := clientConfig.LoadClientSettings(); err != nil {
+		return err, 1
+	}
+	if err := api.InitializeMtlsClient(*insecure); err != nil {
+		return err, 1
+	}
+
+	return api.HandleSync(*assumeYes, *insecure)
+}
+
+func parseSelfUpdate() (error, int) {
+	fs := flag.NewFlagSet("selfupdate", flag.ExitOnError)
+	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
+	fs.Parse(os.Args[2:])
+
+	if err := clientConfig.LoadClientSettings(); err != nil {
+		return err, 1
+	}
+	if err := api.InitializeMtlsClient(*insecure); err != nil {
+		return err, 1
+	}
+
+	return api.HandleSelfUpdate()
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		cli.PrintUsage("epull", []cli.Command{
 			{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
 			{Name: "provision", Description: "Provisions your machine on the target server"},
+			{Name: "sync", Description: "Sync your portage config with the server flavor"},
+			{Name: "selfupdate", Description: "Replace this epull binary with the server-hosted build"},
 		})
 		os.Exit(2)
 	}
@@ -76,6 +109,18 @@ func main() {
 		err, exitCode := parseProvision()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "\x1b[31mProvision went wrong,\x1b[0m", err)
+		}
+		os.Exit(exitCode)
+	case "sync":
+		err, exitCode := parseSync()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "\x1b[31mSync went wrong,\x1b[0m", err)
+		}
+		os.Exit(exitCode)
+	case "selfupdate":
+		err, exitCode := parseSelfUpdate()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "\x1b[31mSelfupdate went wrong,\x1b[0m", err)
 		}
 		os.Exit(exitCode)
 	}

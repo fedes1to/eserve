@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -9,29 +8,29 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
+// done and cancelled are clean stops, error is a failure
 func readJobStream(body io.Reader) error {
-	scanner := bufio.NewScanner(body)
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Println(line)
+	return protocol.EachSSEEvent(body, func(event protocol.StreamEvent) bool {
+		terminal, err := handleStreamEvent(event.Type, event.Message)
+		return err != nil || terminal
+	})
+}
 
-		if strings.Contains(line, protocol.Red) { // red line means racc's job failed or was cancelled
-			return fmt.Errorf("racc's job ended with an error: %s",
-				strings.ReplaceAll(line, protocol.Red, ""))
-		}
+func handleStreamEvent(eventType, message string) (bool, error) {
+	fmt.Println(protocol.Colorize(protocol.StreamEvent{Type: eventType, Message: message}))
+	switch eventType {
+	case "done", "cancelled":
+		return true, nil // clean stop
+	case "error":
+		return true, fmt.Errorf("racc's job ended with an error: %s", message)
 	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return nil
+	return false, nil
 }
 
 func openJobStream(jobID string) (response *http.Response, err error) {

@@ -46,7 +46,21 @@ func postProvisioning(flavor, stage, token string) error {
 		return err
 	}
 
-	return storage.WriteBinhostConfig(flavor, provisionResponse.BinhostURL)
+	// no -flavor means the server uses whatever it already tracks
+	if flavor == "" {
+		flavor = provisionResponse.Flavor
+	}
+
+	if err = storage.WriteBinhostConfig(flavor, provisionResponse.BinhostURL); err != nil {
+		return err
+	}
+
+	// a fresh provision may have reset the flavor's config; not fatal, 'epull sync' fixes it
+	if err := runSync(false); err != nil {
+		log.Printf("portage config may need syncing: %v", err)
+	}
+
+	return nil
 }
 
 func HandleProvision(flavor, stage, token string) (error, int) {

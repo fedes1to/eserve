@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
@@ -64,7 +65,16 @@ func serveHTTP(adminEnabled bool) error {
 	if adminEnabled {
 		adminMux := http.NewServeMux()
 		adminMux.HandleFunc(urls.CreateTokenSuburl, admin.PostCreateToken)
+		adminMux.HandleFunc(urls.TokensListSuburl, admin.PostListTokens)
 		adminMux.HandleFunc(urls.RevokeMachineSuburl, admin.PostRevokeMachine)
+		adminMux.HandleFunc(urls.MachinesListSuburl, admin.PostListMachines)
+		adminMux.HandleFunc(urls.BuildStartSuburl, admin.PostStartBuild)
+		adminMux.HandleFunc(urls.JobsListSuburl, admin.PostListJobs)
+		adminMux.HandleFunc(urls.AdminJobsCancelSuburl, admin.PostAdminCancelJob)
+		adminMux.HandleFunc(urls.AdminJobsStreamSuburl, admin.PostAdminJobStream)
+		adminMux.HandleFunc(urls.FlavorApplySuburl, admin.PostApplyFlavor)
+		adminMux.HandleFunc(urls.BinaryUploadSuburl, admin.PostUploadBinary)
+		adminMux.HandleFunc(urls.BinaryListSuburl, admin.PostListBinaries)
 
 		os.Remove(urls.SocketPath)
 		unixSocket, err := net.Listen("unix", urls.SocketPath)
@@ -97,6 +107,10 @@ func serveHTTP(adminEnabled bool) error {
 	apiMux.Handle(urls.StagesSuburl, requireClientCert(http.HandlerFunc(api.GetStages)))
 	apiMux.Handle(urls.JobsStreamSuburl, requireClientCert(http.HandlerFunc(api.GetJobStream)))
 	apiMux.Handle(urls.JobsCancelSuburl, requireClientCert(http.HandlerFunc(api.PostCancelJob)))
+	apiMux.Handle(urls.BinarySuburl, requireClientCert(http.HandlerFunc(api.GetBinary)))
+	apiMux.Handle(urls.BinaryManifestSuburl, requireClientCert(http.HandlerFunc(api.GetBinaryManifest)))
+	// portage can't do mTLS; binaries/ stays out, its mTLS-only at /api/v1/binary
+	apiMux.Handle(urls.PkgsSuburl+"/", pkgsHandler(serverConfig.Settings.RepoBase))
 
 	apiServer := &http.Server{
 		Addr:      serverConfig.Settings.ListenAddr,
@@ -104,4 +118,18 @@ func serveHTTP(adminEnabled bool) error {
 		TLSConfig: tlsCfg,
 	}
 	return apiServer.ListenAndServeTLS("", "")
+}
+
+// serves the binhost dirs off repo_base, minus the binaries dir
+func pkgsHandler(repoBase string) http.Handler {
+	fileServer := http.FileServer(http.Dir(repoBase))
+	return http.StripPrefix(urls.PkgsSuburl+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// strip the leading slash, the toolchain's StripPrefix drops it
+		p := strings.TrimPrefix(r.URL.Path, "/")
+		if p == "binaries" || strings.HasPrefix(p, "binaries/") {
+			http.NotFound(w, r)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	}))
 }

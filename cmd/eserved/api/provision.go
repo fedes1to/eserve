@@ -45,7 +45,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job, err := jobs.Registry.Start(identity.CN, func(ctx context.Context, job *jobs.Job) {
+	job, err := jobs.Registry.Start(identity.CN, provisionRequest.Flavor, "provision", func(ctx context.Context, job *jobs.Job) {
 		ProvisionJob(ctx, job, provisionRequest, token)
 	})
 	if err != nil {
@@ -58,7 +58,8 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusAccepted)
 	if err := json.NewEncoder(w).Encode(protocol.ProvisionResponse{
 		JobID:      job.ID,
-		BinhostURL: serverConfig.Settings.BaseBinhostURL,
+		BinhostURL: strings.TrimRight(serverConfig.Settings.BaseBinhostURL, "/") + "/" + provisionRequest.Flavor,
+		Flavor:     provisionRequest.Flavor,
 	}); err != nil {
 		log.Printf("%v: racc couldn't encode job response: %v\n", ClientIP(r), err)
 	}
