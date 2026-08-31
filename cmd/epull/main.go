@@ -16,6 +16,7 @@ func parseRegister() (error, int) {
 	token := fs.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
 	server := fs.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
 	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")
+	stage := fs.String("stage", "", "Stage3 file used on provisioning")
 	insecure := fs.Bool("insecure", false, "Allow insecure requests, DO NOT USE OUTSIDE OF TESTING")
 
 	fs.Parse(os.Args[2:])
@@ -27,7 +28,7 @@ func parseRegister() (error, int) {
 	if *flavor == "" {
 		*flavor, _ = os.Hostname()
 	}
-	return api.HandleRegistration(*token, *server, *flavor, *insecure)
+	return api.HandleRegistration(*token, *server, *flavor, *stage, *insecure)
 }
 
 func parseProvision() (error, int) {

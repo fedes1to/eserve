@@ -140,6 +140,9 @@ func extractArchive(ctx context.Context, archivePath string, root *os.Root, stag
 
 		switch header.Typeflag {
 		case tar.TypeDir:
+			if err := clearTypeMismatch(root, staging+"/"+name, true); err != nil {
+				return nil, "", err
+			}
 			if err := root.MkdirAll(staging+"/"+name, 0o755); err != nil {
 				return nil, "", fmt.Errorf("couldn't create directory %q: %w", name, err)
 			}
@@ -172,6 +175,9 @@ func validateMemberName(name string) (string, error) {
 }
 
 func writeMemberFile(root *os.Root, name string, tarReader *tar.Reader, total *int64) (int64, []byte, error) {
+	if err := clearTypeMismatch(root, name, false); err != nil {
+		return 0, nil, err
+	}
 	if err := root.MkdirAll(path.Dir(name), 0o755); err != nil {
 		return 0, nil, fmt.Errorf("couldn't create directory for %q: %w", name, err)
 	}
@@ -196,6 +202,19 @@ func writeMemberFile(root *os.Root, name string, tarReader *tar.Reader, total *i
 		return 0, nil, fmt.Errorf("couldn't finish writing %q: %w", name, err)
 	}
 	return written, hash.Sum(nil), nil
+}
+
+// an earlier layer can leave the same path as the other kind of entry;
+// later layers win, so replace it
+func clearTypeMismatch(root *os.Root, name string, wantDir bool) error {
+	st, err := root.Stat(name)
+	if err != nil || st.IsDir() == wantDir {
+		return nil
+	}
+	if wantDir {
+		return root.Remove(name)
+	}
+	return root.RemoveAll(name)
 }
 
 func linkSyncedPaths(root *os.Root, present map[string]bool) error {

@@ -3,12 +3,16 @@ package api
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
 var mtlsClient *http.Client
@@ -86,8 +90,17 @@ func InitializeMtlsClient(insecure bool) error {
 		MinVersion:   tls.VersionTLS13,
 	}
 
-	if insecure {
+	caFile := filepath.Join(config.ClientConfigPath, "ca.crt")
+	if data, err := os.ReadFile(caFile); err == nil {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(data) {
+			return fmt.Errorf("%s does not contain a valid certificate", caFile)
+		}
+		tlsConfig.RootCAs = pool
+	} else if insecure {
 		tlsConfig.InsecureSkipVerify = true
+	} else {
+		return fmt.Errorf("no trusted server certificate: put the eserved CA at %s, or use -insecure", caFile)
 	}
 
 	mtlsClient = &http.Client{

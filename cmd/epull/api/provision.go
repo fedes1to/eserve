@@ -51,6 +51,11 @@ func postProvisioning(flavor, stage, token string) error {
 		flavor = provisionResponse.Flavor
 	}
 
+	// trust the server's signing key before telling portage to require signatures
+	if err = SetupSigningKey(); err != nil {
+		return err
+	}
+
 	if err = storage.WriteBinhostConfig(flavor, provisionResponse.BinhostURL); err != nil {
 		return err
 	}

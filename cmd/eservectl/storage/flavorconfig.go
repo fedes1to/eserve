@@ -12,7 +12,14 @@ import (
 const defaultFlavorMakeConf = `# flavor build config: this wins over the client's make.conf
 CFLAGS="-O2 -pipe -march=native"
 CXXFLAGS="${CFLAGS}"
-FEATURES="${FEATURES} -binpkg-request-signature"
+FEATURES="${FEATURES} -binpkg-request-signature binpkg-signing"
+BINPKG_GPG_SIGNING_BASE_COMMAND="gpg --sign --armor --batch --no-tty --yes [PORTAGE_CONFIG]"
+BINPKG_GPG_SIGNING_GPG_HOME="/etc/eserved-gnupg"
+BINPKG_GPG_SIGNING_DIGEST="SHA256"
+BINPKG_GPG_VERIFY_BASE_COMMAND="gpg --status-fd 2 --verify [PORTAGE_CONFIG] [SIGNATURE]"
+BINPKG_GPG_VERIFY_GPG_HOME="/etc/eserved-gnupg"
+// portage drops verify to user "nobody" by default, which cant read the root-only keyring
+GPG_VERIFY_USER_DROP=""
 `
 
 const defaultFlavorBinreposConf = `# no remote binrepos in the build chroot

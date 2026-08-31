@@ -18,6 +18,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/gpg"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
@@ -57,6 +58,7 @@ func serveHTTP(adminEnabled bool) error {
 		{Name: "tls certificate", Function: storage.LoadTlsCertificates},
 		{Name: "tokens", Function: storage.LoadTokens},
 		{Name: "machines", Function: storage.LoadMachines},
+		{Name: "signing key", Function: gpg.EnsureKey},
 	}
 	if err := cli.MustInit(steps); err != nil {
 		return err
@@ -101,6 +103,7 @@ func serveHTTP(adminEnabled bool) error {
 
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc(urls.IdentitySuburl, api.PostIdentity)
+	apiMux.HandleFunc(urls.CaSuburl, api.GetCa)
 	apiMux.Handle(urls.ProvisionSuburl, requireClientCert(http.HandlerFunc(api.PostProvision)))
 	apiMux.Handle(urls.SyncSuburl, requireClientCert(http.HandlerFunc(api.PostSync)))
 	apiMux.Handle(urls.CheckSyncSuburl, requireClientCert(http.HandlerFunc(api.PostCheckSync)))
@@ -109,6 +112,7 @@ func serveHTTP(adminEnabled bool) error {
 	apiMux.Handle(urls.JobsCancelSuburl, requireClientCert(http.HandlerFunc(api.PostCancelJob)))
 	apiMux.Handle(urls.BinarySuburl, requireClientCert(http.HandlerFunc(api.GetBinary)))
 	apiMux.Handle(urls.BinaryManifestSuburl, requireClientCert(http.HandlerFunc(api.GetBinaryManifest)))
+	apiMux.Handle(urls.SigningKeySuburl, requireClientCert(http.HandlerFunc(api.GetSigningKey)))
 	// portage can't do mTLS; binaries/ stays out, its mTLS-only at /api/v1/binary
 	apiMux.Handle(urls.PkgsSuburl+"/", pkgsHandler(serverConfig.Settings.RepoBase))
 

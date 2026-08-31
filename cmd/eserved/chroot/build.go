@@ -14,6 +14,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
+	"git.fedesito.me/fedes1to/eserve/internal/gpg"
 )
 
 // atoms end up on a chroot command line, keep them boring: no flags, no metacharacters
@@ -112,15 +113,39 @@ func chrootRepoDir(flavor string) string {
 	return filepath.Join(chrootDir(flavor), "var/db/repos/gentoo")
 }
 
-func chrootEmerge(ctx context.Context, job *jobs.Job, flavor string, args ...string) *exec.Cmd {
-	full := append([]string{
-		chrootDir(flavor),
+// bwrap wraps the chroot in fresh pid/ipc/uts/mount namespaces
+func useBwrap() bool {
+	_, err := exec.LookPath("bwrap")
+	return err == nil
+}
+
+func flavorEmerge(ctx context.Context, job *jobs.Job, flavor string, args ...string) *exec.Cmd {
+	inner := append([]string{
 		"/usr/bin/env", "-i",
 		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
 		"HOME=/root",
 		"/usr/bin/emerge",
 	}, args...)
-	command := exec.CommandContext(ctx, "chroot", full...)
+	bwrap := useBwrap()
+	var command *exec.Cmd
+	if bwrap {
+		full := append([]string{
+			"--new-session", "--die-with-parent",
+			"--unshare-pid", "--unshare-ipc", "--unshare-uts",
+			"--bind", chrootDir(flavor), "/",
+			"--dev-bind", "/dev", "/dev",
+			"--proc", "/proc",
+			"--bind", "/sys", "/sys",
+			"--bind", "/etc/resolv.conf", "/etc/resolv.conf",
+			"--bind", "/etc/hosts", "/etc/hosts",
+			"--chdir", "/",
+			"--",
+		}, inner...)
+		command = exec.CommandContext(ctx, "bwrap", full...)
+	} else {
+		full := append([]string{chrootDir(flavor)}, inner...)
+		command = exec.CommandContext(ctx, "chroot", full...)
+	}
 	command.Stdout = &jobs.JobWriter{Job: job}
 	command.Stderr = &jobs.JobWriter{Job: job}
 	return command
@@ -138,7 +163,7 @@ func ensureRepo(ctx context.Context, job *jobs.Job, flavor string) error {
 
 	if _, err := os.Stat(repoDir); err == nil {
 		job.WriteProgress("syncing the chroot's gentoo repo")
-		if err := chrootEmerge(ctx, job, flavor, "--sync").Run(); err == nil {
+		if err := flavorEmerge(ctx, job, flavor, "--sync").Run(); err == nil {
 			return touchRepoMarker(job, flavor)
 		}
 		job.WriteProgress("portage sync failed, falling back to the server's repo")
@@ -170,6 +195,76 @@ func touchRepoMarker(job *jobs.Job, flavor string) error {
 	return os.WriteFile(repoMarkerPath(flavor), nil, 0o644)
 }
 
+func setupChrootSigning(flavor string) error {
+	if err := gpg.CopyTo(filepath.Join(chrootDir(flavor), "etc/eserved-gnupg")); err != nil {
+		return fmt.Errorf("couldn't copy the signing key into the chroot: %w", err)
+	}
+	fingerprint, err := gpg.KeyFingerprint()
+	if err != nil {
+		return err
+	}
+	// the flavor layer wins make.conf, so the key id gets appended, never layered
+	return upsertMakeConfLine(filepath.Join(chrootDir(flavor), "etc/portage/make.conf"), "BINPKG_GPG_SIGNING_KEY", fmt.Sprintf(`"%s"`, fingerprint))
+}
+
+func upsertMakeConfLine(path, variable, value string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	out := make([]string, 0, len(strings.Split(string(data), "\n"))+1)
+	found := false
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, variable+"=") {
+			line = variable + "=" + value
+			found = true
+		}
+		out = append(out, line)
+	}
+	if !found {
+		out = append(out, variable+"="+value)
+	}
+	return os.WriteFile(path, []byte(strings.Join(out, "\n")), 0o644)
+}
+
+func cleanAtomCache(flavor string, atoms []string) {
+	for _, atom := range atoms {
+		parts := strings.SplitN(atom, "/", 3)
+		if len(parts) < 2 {
+			continue
+		}
+		name := strings.SplitN(parts[1], "-", 2)[0]
+		os.RemoveAll(filepath.Join(chrootDir(flavor), "var/cache/binpkgs", parts[0], name))
+	}
+}
+
+func checkBuiltPkgs(flavor string, atoms []string) error {
+	for _, atom := range atoms {
+		parts := strings.SplitN(atom, "/", 3)
+		if len(parts) < 2 {
+			continue
+		}
+		name := strings.SplitN(parts[1], "-", 2)[0]
+		dir := filepath.Join(chrootDir(flavor), "var/cache/binpkgs", parts[0], name)
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return fmt.Errorf("no binpkg was produced for %s: %w", atom, err)
+		}
+		ok := false
+		for _, e := range entries {
+			info, err := e.Info()
+			if err == nil && !e.IsDir() && strings.HasSuffix(e.Name(), ".gpkg.tar") && info.Size() > 0 {
+				ok = true
+				break
+			}
+		}
+		if !ok {
+			return fmt.Errorf("no usable binpkg was produced for %s", atom)
+		}
+	}
+	return nil
+}
+
 // a client sync can swap the portage config mid-build, so take the flavor lock too
 func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []string) error {
 	if !validFlavor(flavor) {
@@ -191,14 +286,22 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 	defer unlock()
 
 	job.WriteProgress("preparing the chroot")
-	if err := mountChroot(flavor); err != nil {
-		return err
+	if !useBwrap() {
+		if err := mountChroot(flavor); err != nil {
+			return err
+		}
+		defer unmountChroot(flavor, job)
 	}
-	defer unmountChroot(flavor, job)
-
 	if err := ensureRepo(ctx, job, flavor); err != nil {
 		return err
 	}
+
+	if err := setupChrootSigning(flavor); err != nil {
+		return err
+	}
+
+	// stale cached gpkgs of the requested atoms would get published next to the fresh ones
+	cleanAtomCache(flavor, packages)
 
 	threads := serverConfig.Settings.BuildThreads
 	parallel := "-j" // 0 = unlimited, let portage decide
@@ -207,9 +310,14 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 	}
 
 	job.WriteProgress("building " + strings.Join(packages, ", "))
-	args := append([]string{"--buildpkg", "--usepkg=y", parallel}, packages...)
-	if err := chrootEmerge(ctx, job, flavor, args...).Run(); err != nil {
+	args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
+	if err := flavorEmerge(ctx, job, flavor, args...).Run(); err != nil {
 		return fmt.Errorf("emerge failed: %w", err)
+	}
+
+	// portage can exit 0 even when the build produced nothing usable
+	if err := checkBuiltPkgs(flavor, packages); err != nil {
+		return err
 	}
 
 	job.WriteProgress("publishing the binpkgs to the binhost")

@@ -27,7 +27,9 @@ func PostStartBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job, err := jobs.Registry.Start("", buildRequest.Flavor, "build", func(ctx context.Context, job *jobs.Job) {
-		chroot.BuildJob(ctx, job, buildRequest.Flavor, buildRequest.Packages)
+		if err := chroot.BuildJob(ctx, job, buildRequest.Flavor, buildRequest.Packages); err != nil {
+			job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
+		}
 	})
 	if err != nil {
 		http.Error(w, "failed to start build, check logs", http.StatusServiceUnavailable)

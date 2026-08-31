@@ -31,7 +31,7 @@ func copyFlavorConfig(root *os.Root, staging, flavor string) (present map[string
 	base := config.FlavorConfigDir(flavor)
 	entries, err := os.ReadDir(base)
 	if err != nil {
-		return nil, false, nil // no flavor config yet, not an error
+		return map[string]bool{}, false, nil // no flavor config yet, not an error
 	}
 
 	present = make(map[string]bool)

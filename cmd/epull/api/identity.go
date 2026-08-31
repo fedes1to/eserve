@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"git.fedesito.me/fedes1to/eserve/cmd/epull/clientConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
+	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 	"io"
@@ -45,7 +46,18 @@ func postIdentification(token string, server string, flavor string, insecure boo
 
 	// request to /api/v1/identity
 	var client *http.Client
-	if insecure {
+	caFile := filepath.Join(config.ClientConfigPath, "ca.crt")
+	if data, err := os.ReadFile(caFile); err == nil {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(data) {
+			return fmt.Errorf("pinned CA at %s is not a valid certificate", caFile)
+		}
+		client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS13},
+			},
+		}
+	} else if insecure {
 		client = &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -142,10 +154,11 @@ func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client,
 	return nil
 }
 
-func HandleRegistration(token, server, flavor string, insecure bool) (error, int) {
+func HandleRegistration(token, server, flavor, stage string, insecure bool) (error, int) {
 	log.Printf("Registering on server: %v with flavor %v", server, flavor)
 
 	err, exitCode := cli.MustRegister([]cli.InitStep{
+		{Name: "ca pin", Function: func() error { return pinIfMissing(server, insecure) }},
 		{Name: "identity", Function: func() error { return postIdentification(token, server, flavor, insecure) }},
 		{Name: "mtls client", Function: func() error { return InitializeMtlsClient(insecure) }},
 	})
@@ -153,9 +166,11 @@ func HandleRegistration(token, server, flavor string, insecure bool) (error, int
 		return err, exitCode
 	}
 
-	stage, err := AskStagefile()
-	if err != nil {
-		return err, 1
+	if stage == "" {
+		stage, err = AskStagefile()
+		if err != nil {
+			return err, 1
+		}
 	}
 	return cli.MustRegister([]cli.InitStep{
 		{Name: "provision", Function: func() error { return postProvisioning(flavor, stage, token) }}})

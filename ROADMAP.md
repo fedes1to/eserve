@@ -16,10 +16,13 @@ Simple roadmap to check progress/features
 - CA-signed server cert (binhost verifiable by clients that trust the eserved CA)
 - binary hosting + epull selfupdate
 - eservectl job/build/flavor/binary commands
+- bubblewrap build sandbox (root bind required) + chroot fallback
+- repo signing end to end (passphraseless server key, embedded gpkg sigs, epull key bootstrap, portage verifies)
+- CA pinning for epull (open /api/v1/ca, no -insecure in steady state)
+- register -stage (non-interactive register)
+- binrepo priority 10000 (beats the stage-baked official repos)
 
 ## TODO (atm)
-- bubblewrap "bindings"
-- repo signing (binhost is unsigned for now)
 - almost everything cuh
 
 ## PLANNED

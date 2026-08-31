@@ -8,16 +8,19 @@ import (
 
 const PortageConfigRoot = "/etc/portage"
 
-// the binhost is unsigned, verify-signature stays off until signing lands
 const binhostConfigTemplate = `[%s]
-priority = 9999
+priority = 10000
 sync-uri = %s
 location = /var/cache/binhost/%s
-verify-signature = false
+verify-signature = true
 `
 
 func WriteBinhostConfig(flavor, binhostURL string) error {
 	path := PortageConfigRoot + "/binrepos.conf"
+	// gentoo ships binrepos.conf as a drop-in directory
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		path = path + "/eserved.conf"
+	}
 	existing, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return err
@@ -33,14 +36,24 @@ func WriteBinhostConfig(flavor, binhostURL string) error {
 	}
 
 	if start != -1 {
-		// the section's old sync-uri is still current? leave it alone
+		// our keys still current? leave it alone (user-added keys stay)
+		syncURI, verifySignature, priority := "", "", ""
 		for i := start + 1; i < len(lines); i++ {
-			if strings.HasPrefix(strings.TrimSpace(lines[i]), "sync-uri") {
-				if strings.TrimSpace(lines[i]) == "sync-uri = "+binhostURL {
-					return nil
-				}
+			trimmed := strings.TrimSpace(lines[i])
+			if strings.HasPrefix(trimmed, "[") {
 				break
 			}
+			switch {
+			case strings.HasPrefix(trimmed, "sync-uri"):
+				syncURI = trimmed
+			case strings.HasPrefix(trimmed, "verify-signature"):
+				verifySignature = trimmed
+			case strings.HasPrefix(trimmed, "priority"):
+				priority = trimmed
+			}
+		}
+		if syncURI == "sync-uri = "+binhostURL && verifySignature == "verify-signature = true" && priority == "priority = 10000" {
+			return nil
 		}
 
 		// replace the section in place (up to the next section or EOF)
