@@ -21,13 +21,14 @@ Simple roadmap to check progress/features
 - CA pinning for epull (open /api/v1/ca, no -insecure in steady state)
 - register -stage (non-interactive register)
 - binrepo priority 10000 (beats the stage-baked official repos)
+- machine/token delete + health endpoint + OpenRC service (pidfile, boot start)
+- second VM (epuller) on the full steady state, signed consumption there
+- build flavor builds the init system (user-tuned package.use drop-ins)
+- crossdev support (cross.conf per flavor, toolchain sdk + per-package staging via crossdev)
 
 ## TODO (atm)
+- the gnome flavor's stored sync is stale by design, re-sync it when the flavor is used again
 - almost everything cuh
-
-## PLANNED
-- crossdev support
-- other distros/os' maybe?
 
 ## NOT GOING TO BE IMPLEMENTED
 - fail2ban / rate limits

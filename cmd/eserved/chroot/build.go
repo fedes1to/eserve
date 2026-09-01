@@ -119,12 +119,12 @@ func useBwrap() bool {
 	return err == nil
 }
 
-func flavorEmerge(ctx context.Context, job *jobs.Job, flavor string, args ...string) *exec.Cmd {
+func flavorCommand(ctx context.Context, job *jobs.Job, flavor, exe string, args ...string) *exec.Cmd {
 	inner := append([]string{
 		"/usr/bin/env", "-i",
 		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
 		"HOME=/root",
-		"/usr/bin/emerge",
+		exe,
 	}, args...)
 	bwrap := useBwrap()
 	var command *exec.Cmd
@@ -149,6 +149,10 @@ func flavorEmerge(ctx context.Context, job *jobs.Job, flavor string, args ...str
 	command.Stdout = &jobs.JobWriter{Job: job}
 	command.Stderr = &jobs.JobWriter{Job: job}
 	return command
+}
+
+func flavorEmerge(ctx context.Context, job *jobs.Job, flavor string, args ...string) *exec.Cmd {
+	return flavorCommand(ctx, job, flavor, "/usr/bin/emerge", args...)
 }
 
 // fresh marker? as-is. stale? sync. sync fails? copy the server's own repo
@@ -300,6 +304,16 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		return err
 	}
 
+	crossTarget, hasCross := CrossTarget(flavor)
+	if hasCross {
+		if err := ensureCrossDev(ctx, job, flavor, crossTarget); err != nil {
+			return err
+		}
+		if err := SyncCrossOverlay(flavor, crossTarget); err != nil {
+			return err
+		}
+	}
+
 	// stale cached gpkgs of the requested atoms would get published next to the fresh ones
 	cleanAtomCache(flavor, packages)
 
@@ -309,10 +323,23 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		parallel = fmt.Sprintf("-j%d", threads)
 	}
 
-	job.WriteProgress("building " + strings.Join(packages, ", "))
-	args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
-	if err := flavorEmerge(ctx, job, flavor, args...).Run(); err != nil {
-		return fmt.Errorf("emerge failed: %w", err)
+	if hasCross {
+		job.WriteProgress("cross-building " + strings.Join(packages, ", ") + " for " + crossTarget)
+		for _, atom := range packages {
+			catPn := crossAtom(atom)
+			if !crossEbuildPresent(flavor, crossTarget, catPn) {
+				return fmt.Errorf("no cross ebuild for %s yet: drop one into flavors/%s/crossdev/cross-%s/%s and run flavor apply (crossdev only auto-generates the toolchain stages)", catPn, flavor, crossTarget, catPn)
+			}
+			if err := flavorCommand(ctx, job, flavor, "/usr/bin/crossdev", "-t", crossTarget, "-oO", filepath.Join(chrootDir(flavor), "usr/portage/local/crossdev"), "--ex-only", "--ex-pkg", catPn, "--portage", "-v").Run(); err != nil {
+				return fmt.Errorf("cross build of %s failed: %w", atom, err)
+			}
+		}
+	} else {
+		job.WriteProgress("building " + strings.Join(packages, ", "))
+		args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
+		if err := flavorEmerge(ctx, job, flavor, args...).Run(); err != nil {
+			return fmt.Errorf("emerge failed: %w", err)
+		}
 	}
 
 	// portage can exit 0 even when the build produced nothing usable

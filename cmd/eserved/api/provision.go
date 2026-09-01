@@ -44,8 +44,8 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if chroot.IsGccMachineDiff(provisionRequest.GccMachine) {
-		http.Error(w, "crossdev not supported, choose same arch as eserved", http.StatusBadRequest)
+	if chroot.IsGccMachineDiff(provisionRequest.GccMachine) && !chroot.CrossCoversArch(provisionRequest.Flavor, provisionRequest.GccMachine) {
+		http.Error(w, "cross arch not supported for this flavor, choose same arch as eserved", http.StatusBadRequest)
 		return
 	}
 
