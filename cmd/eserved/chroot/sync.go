@@ -30,7 +30,7 @@ var syncedPathSet = func() map[string]bool {
 	return set
 }()
 
-func validFlavor(flavor string) bool {
+func ValidFlavor(flavor string) bool {
 	if flavor == "" || flavor == "." || flavor == ".." {
 		return false
 	}
@@ -46,7 +46,7 @@ func SyncArchivePath(flavor, cn string) string {
 }
 
 func IsProvisioned(flavor string) bool {
-	if !validFlavor(flavor) {
+	if !ValidFlavor(flavor) {
 		return false
 	}
 	_, err := os.Stat(filepath.Join(chrootDir(flavor), "etc", stageMarker))
@@ -54,7 +54,7 @@ func IsProvisioned(flavor string) bool {
 }
 
 func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath string) (string, error) {
-	if !validFlavor(flavor) {
+	if !ValidFlavor(flavor) {
 		return "", fmt.Errorf("invalid flavor %q", flavor)
 	}
 	unlock := flavorlock.Lock(flavor)

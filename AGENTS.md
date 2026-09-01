@@ -40,7 +40,7 @@ Non-obvious details:
 - Both sides enforce TLS 1.3 minimum.
 - **Tokens are one-shot** (single identity, or single flavor-switch during provision). New tokens via `eservectl token create`. `isTokenAvailableLocked` treats a used token with an existing machine as unavailable.
 - **Revocation is sticky**: `eservectl machine revoke -cn <name>` sets `RevokedAt`; neither re-identifying nor re-provisioning clears it, and there is no un-revoke endpoint.
-- Flavor is used as a chroot **directory name** — no slashes/spaces. `chroot.validFlavor` enforces this in the sync/provision-apply paths; identity itself only checks non-empty.
+- Flavor is used as a chroot **directory name** — no slashes/spaces/dots. `chroot.ValidFlavor` enforces this anywhere a flavor reaches the filesystem (provision, sync, build, publish), and `storage.ValidCN` gives the machine CN the same rules (it's the client-controlled identifier that ends up in the sync archive's file name).
 
 ### HTTP surface
 
@@ -149,6 +149,7 @@ The work of both sessions is **committed on local `main`** (this commit); the tr
 - **binrepo priority**: epull now writes `priority = 10000` (the catalyst bakes `[gentoo-x86-64-v3]` at 9999 into the stage3 `/etc/portage`; a tie meant the official repo wins and its Gentoo-signed gpkgs fail against our keyring — correctly refused, but it broke consumption too); the leave-it-alone check now compares the priority key.
 - **Naming settled** (see gotcha above): the admin CLI is `eservctl` everywhere; the old 8-char binary is gone.
 - **Torn writes from a dirty stop** (see gotcha above): a hard stop of the VM tore the just-deployed `/usr/local/bin/epull` and `/root/eserve-src`; a full redeploy from the local tree + rebuild fixed it before the E2E continued.
+- **Bug hunt (day 3)**: four fixes, all negative-tested live — CN shape now validated at identity (was path-traversable into `/etc/eserved/sync/<flavor>/<cn>.tar.gz`), `chroot.ValidFlavor` exported + checked in the provision handler (invalid flavor used to escape `chroot_base` in `Provision`), `UseToken` refuses an already-used token (concurrent identity double-spend), and `PublishBinpkgs` bumps the snapshot timestamp when the dir exists (same-second publishes no longer merge). Plus a comment-cleanup pass (17 restating/stale comments cut).
 
 ### Left to do (small; in order)
 1. **The other VM** (the `epuller` machine, the client box): still runs a pre-priority epull and its `eserved.conf` sections are at priority 9999 — redeploy epull there + sed the priority to 10000 when that box is used again.

@@ -27,7 +27,6 @@ var (
 	serverSettingsPath string         = filepath.Join(ServerConfigPath, "settings.json")
 )
 
-// populates global var Server
 func LoadServerSettings() error {
 	return config.LoadJsonFile(serverSettingsPath, &Settings)
 }

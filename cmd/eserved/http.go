@@ -124,7 +124,6 @@ func serveHTTP(adminEnabled bool) error {
 	return apiServer.ListenAndServeTLS("", "")
 }
 
-// serves the binhost dirs off repo_base, minus the binaries dir
 func pkgsHandler(repoBase string) http.Handler {
 	fileServer := http.FileServer(http.Dir(repoBase))
 	return http.StripPrefix(urls.PkgsSuburl+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

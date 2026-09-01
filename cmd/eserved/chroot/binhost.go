@@ -34,7 +34,7 @@ func isPublishable(rel string, size int64) bool {
 }
 
 func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
-	if !validFlavor(flavor) {
+	if !ValidFlavor(flavor) {
 		return fmt.Errorf("invalid flavor %q", flavor)
 	}
 	pkgDir := filepath.Join(chrootDir(flavor), "var/cache/binpkgs")
@@ -87,6 +87,10 @@ func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
 	}
 
 	now := time.Now().Unix()
+	// two publishes in the same second must not share a dir
+	for fileExists(filepath.Join(binhostDir(flavor), fmt.Sprintf("snapshot-%d", now))) {
+		now++
+	}
 	snapshot := filepath.Join(binhostDir(flavor), fmt.Sprintf("snapshot-%d", now))
 	baseURL := strings.TrimRight(serverConfig.Settings.BaseBinhostURL, "/") + "/" + flavor + fmt.Sprintf("/snapshot-%d/", now)
 

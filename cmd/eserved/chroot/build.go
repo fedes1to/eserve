@@ -267,7 +267,7 @@ func checkBuiltPkgs(flavor string, atoms []string) error {
 
 // a client sync can swap the portage config mid-build, so take the flavor lock too
 func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []string) error {
-	if !validFlavor(flavor) {
+	if !ValidFlavor(flavor) {
 		return fmt.Errorf("invalid flavor %q", flavor)
 	}
 	if len(packages) == 0 {

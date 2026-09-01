@@ -26,7 +26,6 @@ func SafeSaveJsonFile(path string, from any) error {
 		return err
 	}
 
-	// either the new file or the old
 	return os.Rename(tmpPath, path)
 }
 

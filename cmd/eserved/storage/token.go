@@ -14,7 +14,6 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
-// these are pretty much only for logging the tokens and registering
 type TokenEntry struct {
 	CN        string    `json:"cn"`
 	CreatedAt time.Time `json:"created"`
@@ -111,8 +110,11 @@ func ValidCN(token string, cn string) bool {
 	if !exists || cn == "" {
 		return false
 	}
+	// the cn ends up in file names and logs: same boring rules as flavors
+	if cn == "." || cn == ".." || strings.ContainsAny(cn, "/\\ ") {
+		return false
+	}
 
-	// for new cns
 	if entry.CN != "" && cn != entry.CN {
 		return false
 	}
@@ -122,6 +124,10 @@ func ValidCN(token string, cn string) bool {
 func UseToken(token string, cn string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
+
+	if entry, ok := tokens.Entries[token]; ok && (entry.CN != "" || !entry.UsedAt.UTC().IsZero()) {
+		return fmt.Errorf("token already used")
+	}
 
 	if !isTokenAvailableLocked(token) {
 		return fmt.Errorf("Token became invalid at usage")

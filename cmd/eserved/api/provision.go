@@ -31,6 +31,10 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	if provisionRequest.Flavor == "" {
 		provisionRequest.Flavor = machineFlavor
 	}
+	if !chroot.ValidFlavor(provisionRequest.Flavor) {
+		http.Error(w, "invalid flavor", http.StatusBadRequest)
+		return
+	}
 
 	token := ""
 	if machineFlavor != provisionRequest.Flavor {

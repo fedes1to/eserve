@@ -44,7 +44,6 @@ func postIdentification(token string, server string, flavor string, insecure boo
 	keyDER, _ := x509.MarshalPKCS8PrivateKey(privKey)
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyDER})
 
-	// request to /api/v1/identity
 	var client *http.Client
 	caFile := filepath.Join(config.ClientConfigPath, "ca.crt")
 	if data, err := os.ReadFile(caFile); err == nil {
@@ -84,7 +83,6 @@ func postIdentification(token string, server string, flavor string, insecure boo
 		return err
 	}
 
-	// checks to be nice n shit
 	if identificationResponse.CN != hostname {
 		return fmt.Errorf(
 			"Hostname mismatch! expected %v, received %v\n",
@@ -108,7 +106,6 @@ func postIdentification(token string, server string, flavor string, insecure boo
 		Server:         server,
 	}
 
-	// assuming everything went well here, so we save the request
 	if err := os.WriteFile(clientConfig.Settings.CertPath, []byte(identificationResponse.Certificate), 0644); err != nil {
 		return fmt.Errorf("failed to save certificate: %w", err)
 	}
@@ -145,7 +142,6 @@ func sendRequest[T any](request *http.Request, into *T, httpClient *http.Client,
 			response.StatusCode, string(bodyBytes))
 	}
 
-	// decode json to struct
 	err = json.NewDecoder(response.Body).Decode(into)
 	if err != nil {
 		return err

@@ -70,7 +70,7 @@ func Provision(ctx context.Context, job *jobs.Job, request protocol.ProvisionReq
 }
 
 func restoreSyncedConfig(ctx context.Context, job *jobs.Job, flavor, cn string) error {
-	if !validFlavor(flavor) {
+	if !ValidFlavor(flavor) {
 		return fmt.Errorf("invalid flavor %q", flavor)
 	}
 	unlock := flavorlock.Lock(flavor)

@@ -13,7 +13,6 @@ import (
 // the client's own keyring: the server's public key, marked ultimately trusted
 var gpgHome = filepath.Join(config.ClientConfigPath, "gnupg")
 
-// portage only accepts binpkgs signed by keys in this keyring
 var verifyMakeConfLines = []string{
 	`BINPKG_GPG_VERIFY_BASE_COMMAND="gpg --status-fd 2 --verify [PORTAGE_CONFIG] [SIGNATURE]"`,
 	`BINPKG_GPG_VERIFY_GPG_HOME="` + config.ClientConfigPath + `/gnupg"`,

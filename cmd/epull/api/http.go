@@ -61,7 +61,6 @@ func sendMtlsGet[T any](subUrl string, into *T) (int, error) {
 			response.StatusCode, string(bodyBytes))
 	}
 
-	// decode json to struct
 	if err := json.NewDecoder(response.Body).Decode(into); err != nil {
 		return response.StatusCode, err
 	}

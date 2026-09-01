@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 )
 
-// hardcoding go brrr i guess
 const (
 	ServerConfigPath = "/etc/eserved"
 	ClientConfigPath = "/etc/epull"
@@ -15,14 +14,13 @@ const (
 func InitConfigPath(path string) string {
 	info, err := os.Stat(path)
 	if err != nil {
-		// maybe /etc/ doesn't exist (x doubt)? so we use MkdirAll
 		if os.MkdirAll(path, 0755) != nil {
 			log.Fatalln("Can't create config folder, is the process root?")
 		}
 	} else if !info.IsDir() {
 		log.Fatalln("Invalid config path, please check", path)
 	}
-	return path // can be safely ignored, its just for convenience
+	return path
 }
 
 // a flavor's portage config: a plain dir of portage config files

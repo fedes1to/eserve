@@ -8,7 +8,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 )
 
-// stage3's make.conf requires signed binpkgs, our builds are unsigned - strip it
+// stock stage3 make.conf requests signed binpkgs from the official binhost, which we never use; our builds sign themselves via the lines below
 const defaultFlavorMakeConf = `# flavor build config: this wins over the client's make.conf
 CFLAGS="-O2 -pipe -march=native"
 CXXFLAGS="${CFLAGS}"
