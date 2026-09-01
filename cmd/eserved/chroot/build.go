@@ -330,7 +330,7 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 			if !crossEbuildPresent(flavor, crossTarget, catPn) {
 				return fmt.Errorf("no cross ebuild for %s yet: drop one into flavors/%s/crossdev/cross-%s/%s and run flavor apply (crossdev only auto-generates the toolchain stages)", catPn, flavor, crossTarget, catPn)
 			}
-			if err := flavorCommand(ctx, job, flavor, "/usr/bin/crossdev", "-t", crossTarget, "-oO", filepath.Join(chrootDir(flavor), "usr/portage/local/crossdev"), "--ex-only", "--ex-pkg", catPn, "--portage", "-v").Run(); err != nil {
+			if err := flavorCommand(ctx, job, flavor, "/usr/bin/crossdev", "-t", crossTarget, "-oO", "/usr/portage/local/crossdev", "--ex-only", "--ex-pkg", catPn, "--portage", "-v").Run(); err != nil {
 				return fmt.Errorf("cross build of %s failed: %w", atom, err)
 			}
 		}
