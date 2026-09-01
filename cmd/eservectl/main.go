@@ -30,6 +30,7 @@ func printTokenUsage() {
 	cli.PrintUsage("eservectl token", []cli.Command{
 		{Name: "create", Description: "Creates a token on eserved"},
 		{Name: "list", Description: "Lists the tokens on eserved"},
+		{Name: "delete", Description: "Deletes a token on eserved"},
 	})
 	os.Exit(2)
 }
@@ -47,6 +48,7 @@ func printMachineUsage() {
 	cli.PrintUsage("eservectl machine", []cli.Command{
 		{Name: "revoke", Description: "Revokes a machine on eserved"},
 		{Name: "list", Description: "Lists the machines on eserved"},
+		{Name: "delete", Description: "Deletes a machine on eserved (and its stored sync)"},
 	})
 	os.Exit(2)
 }
@@ -86,7 +88,7 @@ func printBinaryUsage() {
 
 func parseTokenFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") ||
-		(os.Args[2] != "create" && os.Args[2] != "list") {
+		(os.Args[2] != "create" && os.Args[2] != "list" && os.Args[2] != "delete") {
 		printTokenUsage()
 	}
 
@@ -118,6 +120,17 @@ func parseTokenFlags() (error, int) {
 				used = token.UsedAt.Format("2006-01-02 15:04:05")
 			}
 			fmt.Printf("%-28s %-16s %-19s %s\n", token.Token, token.CN, token.CreatedAt.Format("2006-01-02 15:04:05"), used)
+		}
+	case "delete":
+		fs := flag.NewFlagSet("token delete", flag.ExitOnError)
+		token := fs.String("token", "", "the token to delete")
+		fs.Parse(os.Args[3:])
+		if *token == "" {
+			return fmt.Errorf("-token flag is required"), 2
+		}
+		err = admin.PostDeleteToken(*token)
+		if err != nil {
+			return fmt.Errorf("Couldn't delete token, %w", err), 1
 		}
 	}
 
@@ -170,7 +183,7 @@ func parseStageFlags() (error, int) {
 
 func parseMachineFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") ||
-		(os.Args[2] != "revoke" && os.Args[2] != "list") {
+		(os.Args[2] != "revoke" && os.Args[2] != "list" && os.Args[2] != "delete") {
 		printMachineUsage()
 	}
 
@@ -207,6 +220,17 @@ func parseMachineFlags() (error, int) {
 				revoked = machine.RevokedAt.Format("2006-01-02 15:04:05")
 			}
 			fmt.Printf("%-16s %-12s %-12s %-40s %-64s %s\n", machine.CN, machine.Flavor, machine.Subarch, machine.Profile, machine.Fingerprint, revoked)
+		}
+	case "delete":
+		fs := flag.NewFlagSet("machine delete", flag.ExitOnError)
+		cn := fs.String("cn", "", "cn (usually hostname) of the machine to delete")
+		fs.Parse(os.Args[3:])
+		if *cn == "" {
+			return fmt.Errorf("-cn flag is required"), 2
+		}
+		err = admin.PostDeleteMachine(*cn)
+		if err != nil {
+			return fmt.Errorf("Couldn't delete machine, %w", err), 1
 		}
 	}
 

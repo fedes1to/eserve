@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
+	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
@@ -77,6 +79,33 @@ func RevokeMachine(cn string) error {
 	machines.Entries[cn] = machineEntry
 
 	return saveMachinesLocked()
+}
+
+func DeleteMachine(cn string) error {
+	machinesMutex.Lock()
+	entry, exists := machines.Entries[cn]
+	if !exists {
+		machinesMutex.Unlock()
+		return fmt.Errorf("can't delete non-existent machine %s", cn)
+	}
+	delete(machines.Entries, cn)
+	err := saveMachinesLocked()
+	machinesMutex.Unlock()
+	if err != nil {
+		return err
+	}
+
+	if entry.Flavor == "" {
+		return nil
+	}
+
+	unlock := flavorlock.Lock(entry.Flavor)
+	defer unlock()
+	if fingerprint, ok := FlavorFingerprintInfo(entry.Flavor); ok && fingerprint.SyncedBy == cn {
+		return SetFlavorFingerprint(entry.Flavor, "", "")
+	}
+	os.Remove(chroot.SyncArchivePath(entry.Flavor, cn))
+	return nil
 }
 
 func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {

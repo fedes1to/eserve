@@ -48,3 +48,25 @@ func PostListMachines() ([]protocol.MachineInfo, error) {
 	}
 	return list.Machines, nil
 }
+
+func PostDeleteMachine(cn string) error {
+	payload := protocol.DeleteMachineRequest{CN: cn}
+	body, _ := json.Marshal(payload)
+	response, err := adminClient.Post(urls.SocketURL+urls.MachineDeleteSuburl, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	bodyString := string(bodyBytes)
+	if response.StatusCode != 200 || bodyString != "ok" {
+		return fmt.Errorf("couldn't delete machine, code %v, body:\n%v", response.StatusCode, bodyString)
+	}
+
+	return nil
+}

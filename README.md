@@ -16,3 +16,6 @@ idea is to have it sync USE flags and also allow to have similar systems easily
 
 ### Dependencies (planned)
 - [bubblewrap](https://github.com/containers/bubblewrap)
+
+## AI
+up to [1ceb5e0](https://git.fedesito.me/fedes1to/eserve/commit/1ceb5e0932fba01b71265e09be132925bc42c040) there was no AI involved, after that commit there was

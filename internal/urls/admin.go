@@ -6,6 +6,8 @@ const (
 	CreateTokenSuburl     = "/admin/v1/token/create"
 	TokensListSuburl      = "/admin/v1/token/list"
 	RevokeMachineSuburl   = "/admin/v1/machine/revoke"
+	MachineDeleteSuburl   = "/admin/v1/machine/delete"
+	TokenDeleteSuburl     = "/admin/v1/token/delete"
 	MachinesListSuburl    = "/admin/v1/machine/list"
 	JobsListSuburl        = "/admin/v1/jobs/list"
 	AdminJobsCancelSuburl = "/admin/v1/jobs/cancel"

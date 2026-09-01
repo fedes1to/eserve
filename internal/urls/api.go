@@ -3,6 +3,7 @@ package urls
 const (
 	IdentitySuburl       = "/api/v1/identity"
 	CaSuburl             = "/api/v1/ca"
+	HealthSuburl         = "/api/v1/health"
 	ProvisionSuburl      = "/api/v1/provision"
 	SyncSuburl           = "/api/v1/sync"
 	CheckSyncSuburl      = "/api/v1/sync/check"

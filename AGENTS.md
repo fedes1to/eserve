@@ -44,11 +44,12 @@ Non-obvious details:
 
 ### HTTP surface
 
-Admin API on unix socket `/run/eserved.sock` (chmod 600; disabled entirely with `-admin=false`): `/admin/v1/token/create`, `/admin/v1/token/list`, `/admin/v1/machine/revoke`, `/admin/v1/machine/list`, `/admin/v1/build/start`, `/admin/v1/jobs/list`, `/admin/v1/jobs/cancel`, `/admin/v1/jobs/stream`, `/admin/v1/flavor/apply`, `/admin/v1/binary/upload`, `/admin/v1/binary/list`. The client uses the Go net/http unix-socket trick: a `DialContext` that dials `"unix"` and URLs of the form `http://unix<suburl>` (cmd/eservectl/admin/http.go).
+Admin API on unix socket `/run/eserved.sock` (chmod 600; disabled entirely with `-admin=false`): `/admin/v1/token/create`, `/admin/v1/token/list`, `/admin/v1/token/delete`, `/admin/v1/machine/revoke`, `/admin/v1/machine/delete`, `/admin/v1/machine/list`, `/admin/v1/build/start`, `/admin/v1/jobs/list`, `/admin/v1/jobs/cancel`, `/admin/v1/jobs/stream`, `/admin/v1/flavor/apply`, `/admin/v1/binary/upload`, `/admin/v1/binary/list`. The client uses the Go net/http unix-socket trick: a `DialContext` that dials `"unix"` and URLs of the form `http://unix<suburl>` (cmd/eservctl/admin/http.go).
 
 Public API on TLS at `settings.json` `listen_addr` (default `127.0.0.1:8080`), all routes in `internal/urls/api.go`:
 
 - `/api/v1/identity` — bootstrap (no client cert)
+- `/api/v1/health` — open (no client cert), plain `ok` on 200, for service monitoring
 - `/api/v1/ca` — open (no client cert): the eserved CA in PEM; epull pins it on first register and verifies against it after
 - `/api/v1/provision` — 202 + `{job_id, binhost_url, flavor}`; switching flavor requires a fresh bearer token. `binhost_url` is per-flavor (`<base_binhost_url>/<flavor>`)
 - `/api/v1/sync` — stores the client's portage-config tar.gz (64 MiB limit) at `/etc/eserved/sync/<flavor>/<cn>.tar.gz`, then applies it to the flavor chroot: canonical copy in `<chroot>/.eserved/` (via `os.Root`, symlinks/hardlinks/traversal rejected) and relative symlinks from `etc/portage/` into it. Requires the `X-Portage-Fingerprint` header and a provisioned flavor; records the fingerprint in `sync/<flavor>/fingerprint.json`
@@ -150,11 +151,11 @@ The work of both sessions is **committed on local `main`** (this commit); the tr
 - **Naming settled** (see gotcha above): the admin CLI is `eservctl` everywhere; the old 8-char binary is gone.
 - **Torn writes from a dirty stop** (see gotcha above): a hard stop of the VM tore the just-deployed `/usr/local/bin/epull` and `/root/eserve-src`; a full redeploy from the local tree + rebuild fixed it before the E2E continued.
 - **Bug hunt (day 3)**: four fixes, all negative-tested live — CN shape now validated at identity (was path-traversable into `/etc/eserved/sync/<flavor>/<cn>.tar.gz`), `chroot.ValidFlavor` exported + checked in the provision handler (invalid flavor used to escape `chroot_base` in `Provision`), `UseToken` refuses an already-used token (concurrent identity double-spend), and `PublishBinpkgs` bumps the snapshot timestamp when the dir exists (same-second publishes no longer merge). Plus a comment-cleanup pass (17 restating/stale comments cut).
+- **Day 4 (ops pass)**: `eservctl machine delete -cn` + `token delete -token` (admin endpoints; machine delete also purges its sync archive and clears the flavor fingerprint `synced_by`), `/api/v1/health`, `eserved -pidfile` + OpenRC unit `/etc/init.d/eserved` (named runlevel, no more manual start). The other VM (`epuller`, 192.168.122.14) brought to steady state: fresh epull uploaded to the binary store, `epull selfupdate` + non-interactive `register -stage` (CA pin + keyring), `eserved.conf` now `priority = 10000` + `verify-signature = true`, and it consumed a **signed** gpkg from the binhost there. Build-flavor chroot fixed for init-system builds: flavor-layer `package.use` drop-in (`dbus`/`virtual/udev`/`virtual/tmpfiles` systemd) + one `-N` world pass; `sys-apps/systemd` then built + published signed (snapshot-1788265034).
 
 ### Left to do (small; in order)
-1. **The other VM** (the `epuller` machine, the client box): still runs a pre-priority epull and its `eserved.conf` sections are at priority 9999 — redeploy epull there + sed the priority to 10000 when that box is used again.
-2. **Gnome flavor sync drift**: flavor `gnome`'s stored sync is still the gnome-profile config while the host `make.profile` is back at base — don't casually `epull sync -y` from the eserver (it would push base config into the gnome flavor); re-sync deliberately when the gnome flavor gets used again.
-3. **Push to origin** when convenient — everything here is committed locally on `main` (forge: `git.fedesito.me/fedes1to/eserve`).
+1. **Gnome flavor sync drift**: flavor `gnome`'s stored sync is still the gnome-profile config while the host `make.profile` is back at base — don't casually `epull sync -y` from the eserver (it would push base config into the gnome flavor); re-sync deliberately when the gnome flavor gets used again.
+2. **epuller's system CA trust wasn't `c_rehash`-ed** (tool unavailable there): the raw `ca.crt` copy in `/etc/ssl/certs/` worked for portage anyway — if it ever stops, hash-symlink it manually.
 
 ### Environment cheat-sheet
 - VM: `sshpass -p drcwfxevs ssh root@192.168.122.200` (kernel 6.18.43, portage 3.0.81 at /usr/lib/python3.14/site-packages/portage, gpg 2.4.8, bwrap 0.11.2 at /usr/bin/bwrap). eserved is started manually after boot (no init script — see gotchas); check with `pgrep -x eserved`; log /var/log/eserved.log (truncated on each restart). The CA trust for portage lives in VM `/etc/ssl/certs/` (`eserved-ca.crt` + hash symlink `dc079d7b.0` — don't remove); `/etc/epull/ca.crt` is epull's pinned CA (steady-state verify).

@@ -144,6 +144,18 @@ func UseToken(token string, cn string) error {
 	return saveTokensLocked()
 }
 
+func DeleteToken(token string) error {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+
+	if _, exists := tokens.Entries[token]; !exists {
+		return fmt.Errorf("can't delete non-existent token %s", token)
+	}
+
+	delete(tokens.Entries, token)
+	return saveTokensLocked()
+}
+
 // returns the tokens, oldest first
 func ListTokens() []protocol.TokenInfo {
 	tokensMutex.RLock()
