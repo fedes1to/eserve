@@ -29,6 +29,12 @@ Simple roadmap to check progress/features
 - switch-token refund when the job never started or failed before the switch was written
 - startup tightening of the legacy state file modes (settings.json, sync/**, jobs/, the keys)
 - the chroot's make.profile follows the client's profile (admin override, else the last provisioner/syncer), so binpkgs are actually usable
+- flavor apply installs the flavor layer on a flavor nobody has synced yet, and a build makes sure it landed (no more unsigned gpkgs from a fresh flavor)
+- epull exits non-zero after a failed job (and skips the signing key / binrepos.conf / sync follow-ups), sync refuses a machine that never provisioned, machine delete removes the sync archive, a flavor switch drops the old binrepo section
+- builds use --update --selective=n: the newest visible version, always a binpkg
+- eservectl flavor delete (refuses while a machine is on the flavor or a job is queued/running)
+- the cross sysroot honours flavors/<name>/profile, and a cross flavor requires the client's exact CHOST
+- static epull (CGO_ENABLED=0) + a same-arch selfupdate fallback, so it runs in musl chroots
 
 ## TODO (atm)
 - almost everything cuh
