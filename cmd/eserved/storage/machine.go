@@ -113,7 +113,13 @@ func DeleteMachine(cn string) error {
 	return nil
 }
 
-func ProvisionMachine(cn, subarch, gccMachine, profile, flavor string) error {
+// the flavor written must be the one the request authorized, so a job can't
+// write a flavor no token paid for
+func ProvisionMachine(cn, subarch, gccMachine, profile, flavor, authorizedFlavor string) error {
+	if flavor != authorizedFlavor {
+		return fmt.Errorf("flavor %v was not authorized for this provision", flavor)
+	}
+
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
@@ -191,6 +197,34 @@ func EnrollMachine(token, cn, flavor, fingerprint string) error {
 	machineEntry.Flavor = flavor
 	machines.Entries[cn] = machineEntry
 	return saveMachinesLocked()
+}
+
+// the flavor-switch policy: the token must be unspent and, if bound, match the
+// machine and the requested flavor; it is consumed in the same lock as the
+// check, so one token can only ever authorize one switch
+func SpendFlavorSwitchToken(token, cn, flavor string) error {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+
+	tokenEntry, exists := tokens.Entries[token]
+	if !exists {
+		return ErrTokenUnknown
+	}
+	if !tokenEntry.UsedAt.UTC().IsZero() {
+		return ErrTokenUsed
+	}
+	if tokenEntry.CN != "" && tokenEntry.CN != cn {
+		return ErrTokenCN
+	}
+	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
+		return ErrTokenFlavor
+	}
+
+	tokenEntry.CN = cn
+	tokenEntry.UsedAt = time.Now()
+	tokens.Entries[token] = tokenEntry
+
+	return saveTokensLocked()
 }
 
 func MachineCertValid(cn, fingerprint string) bool {

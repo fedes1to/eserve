@@ -103,3 +103,81 @@ func TestEnrollMachinePolicy(t *testing.T) {
 		t.Errorf("a path-traversing flavor was accepted: %v", err)
 	}
 }
+
+// the flavor-switch policy: the token must be unspent and, if bound, match the
+// machine and the requested flavor, and it is spent exactly once
+func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
+	dir := t.TempDir()
+	tokensPath = filepath.Join(dir, "tokens.json")
+	machinesPath = filepath.Join(dir, "machines.json")
+	tokens = TokensFile{}
+	machines = MachinesFile{}
+	if err := LoadTokens(); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadMachines(); err != nil {
+		t.Fatal(err)
+	}
+
+	// a cn-bound token can't switch another machine
+	cnBound, err := CreateToken("advS2", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SpendFlavorSwitchToken(cnBound, "advS3", "advt"); !errors.Is(err, ErrTokenCN) {
+		t.Errorf("cn-bound token switching another machine: %v", err)
+	}
+	// and the refusal didn't spend it
+	if err := SpendFlavorSwitchToken(cnBound, "advS2", "advt"); err != nil {
+		t.Fatalf("cn-bound token switching its own machine: %v", err)
+	}
+
+	// a flavor-bound token can't switch to another flavor
+	flavorBound, err := CreateToken("", "gnome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SpendFlavorSwitchToken(flavorBound, "advS", "advt"); !errors.Is(err, ErrTokenFlavor) {
+		t.Errorf("flavor-bound token switching another flavor: %v", err)
+	}
+	if err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); err != nil {
+		t.Fatalf("flavor-bound token switching its own flavor: %v", err)
+	}
+
+	// a spent token can't be spent again
+	if err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); !errors.Is(err, ErrTokenUsed) {
+		t.Errorf("double spend: %v", err)
+	}
+
+	// an unknown token is refused
+	if err := SpendFlavorSwitchToken("nope", "advS", "gnome"); !errors.Is(err, ErrTokenUnknown) {
+		t.Errorf("unknown token: %v", err)
+	}
+
+	// an unbound token switches any machine to any flavor, exactly once
+	unbound, err := CreateToken("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := SpendFlavorSwitchToken(unbound, "advS", "advt"); err != nil {
+		t.Fatalf("unbound token switching: %v", err)
+	}
+	if err := SpendFlavorSwitchToken(unbound, "advS3", "advt"); !errors.Is(err, ErrTokenUsed) {
+		t.Errorf("unbound token spent twice: %v", err)
+	}
+
+	// ProvisionMachine refuses to write a flavor the request didn't authorize
+	enroll, err := CreateToken("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := EnrollMachine(enroll, "advS", "gnome", "fp"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ProvisionMachine("advS", "amd64", "x86_64-pc-linux-gnu", "default/linux/amd64/23.0", "advt", "gnome"); err == nil {
+		t.Error("ProvisionMachine wrote a flavor the request didn't authorize")
+	}
+	if flavor, _ := MachineFlavor("advS"); flavor != "gnome" {
+		t.Errorf("the refused provision changed the flavor to %v", flavor)
+	}
+}

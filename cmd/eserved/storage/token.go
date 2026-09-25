@@ -140,28 +140,6 @@ func ValidCN(token string, cn string) bool {
 	return true
 }
 
-func UseToken(token string, cn string) error {
-	tokensMutex.Lock()
-	defer tokensMutex.Unlock()
-
-	tokenToUse, exists := tokens.Entries[token]
-	if !exists {
-		return ErrTokenUnknown
-	}
-	if !tokenToUse.UsedAt.UTC().IsZero() {
-		return ErrTokenUsed
-	}
-	if tokenToUse.CN != "" && tokenToUse.CN != cn {
-		return ErrTokenCN
-	}
-
-	tokenToUse.CN = cn
-	tokenToUse.UsedAt = time.Now()
-	tokens.Entries[token] = tokenToUse
-
-	return saveTokensLocked()
-}
-
 func DeleteToken(token string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()

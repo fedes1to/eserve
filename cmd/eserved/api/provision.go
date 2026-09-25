@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"strings"
@@ -40,14 +41,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := ""
-	if machineFlavor != provisionRequest.Flavor {
-		token = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if !storage.IsTokenAvailable(token) {
-			http.Error(w, "new token required for flavor", http.StatusUnauthorized)
-			return
-		}
-	}
+	authorizedFlavor := machineFlavor
 	if provisionRequest.GccMachine == "" {
 		http.Error(w, "gcc_machine is required", http.StatusBadRequest)
 		return
@@ -57,8 +51,23 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if machineFlavor != provisionRequest.Flavor {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		// spent here, before the job touches anything, so a token can't be
+		// reused by a concurrent request and a refused switch has no side effect
+		if err := storage.SpendFlavorSwitchToken(token, identity.CN, provisionRequest.Flavor); err != nil {
+			status := http.StatusUnauthorized
+			if errors.Is(err, storage.ErrTokenCN) || errors.Is(err, storage.ErrTokenFlavor) {
+				status = http.StatusBadRequest
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+		authorizedFlavor = provisionRequest.Flavor
+	}
+
 	job, err := jobs.Registry.Start(identity.CN, provisionRequest.Flavor, "provision", func(ctx context.Context, job *jobs.Job) {
-		ProvisionJob(ctx, job, provisionRequest, token)
+		ProvisionJob(ctx, job, provisionRequest, authorizedFlavor)
 	})
 	if err != nil {
 		log.Printf("%v: racc failed to start provision job: %v\n", ClientIP(r), err)
@@ -77,7 +86,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, token string) {
+func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, authorizedFlavor string) {
 	job.WriteProgress("starting provision")
 
 	if err := chroot.Provision(ctx, job, request); err != nil {
@@ -86,16 +95,9 @@ func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.Provision
 	}
 
 	if err := storage.ProvisionMachine(
-		job.CN, request.Subarch, request.GccMachine, request.Profile, request.Flavor); err != nil {
+		job.CN, request.Subarch, request.GccMachine, request.Profile, request.Flavor, authorizedFlavor); err != nil {
 		job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
 		return
-	}
-
-	if token != "" {
-		if err := storage.UseToken(token, job.CN); err != nil {
-			job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
-			return
-		}
 	}
 
 	job.Finish(jobs.StateDone, protocol.StreamEvent{Type: "done", Message: "provision complete"})
