@@ -237,6 +237,13 @@ func (j *Job) IsFinished() bool {
 	return isTerminal(j.State())
 }
 
+// one lock, so the janitor never reads finishedAt unlocked
+func (j *Job) reapable(now time.Time) bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return isTerminal(j.state) && now.Sub(j.finishedAt) > jobRetention
+}
+
 func (j *Job) Cancel() { j.cancel() }
 
 // streams the job as SSE until it ends or the client goes away; cancel may be nil
@@ -303,6 +310,8 @@ var startJanitor sync.Once
 
 // with a flavor, the job waits in that flavor's queue (one at a time); without one it runs now
 func (r *JobRegistry) Start(cn, flavor, kind string, work func(ctx context.Context, job *Job)) (job *Job, err error) {
+	startJanitor.Do(func() { go r.janitor() })
+
 	id, err := newJobID()
 	if err != nil {
 		return nil, err
@@ -440,10 +449,19 @@ func (r *JobRegistry) cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	now := time.Now()
 	for id, job := range r.jobs {
-		if job.IsFinished() && time.Since(job.finishedAt) > jobRetention {
+		if job.reapable(now) {
 			delete(r.jobs, id)
 		}
+	}
+}
+
+func (r *JobRegistry) janitor() {
+	ticker := time.NewTicker(janitorInterval)
+	defer ticker.Stop()
+	for range ticker.C {
+		r.cleanup()
 	}
 }
 
