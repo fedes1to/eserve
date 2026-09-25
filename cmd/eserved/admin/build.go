@@ -12,8 +12,7 @@ import (
 
 func PostStartBuild(w http.ResponseWriter, r *http.Request) {
 	var buildRequest protocol.BuildRequest
-	if err := json.NewDecoder(r.Body).Decode(&buildRequest); err != nil {
-		http.Error(w, "couldn't decode buildRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &buildRequest, "buildRequest") {
 		return
 	}
 

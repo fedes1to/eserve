@@ -13,8 +13,7 @@ import (
 
 func PostRevokeMachine(w http.ResponseWriter, r *http.Request) {
 	var revokeRequest protocol.RevokeRequest
-	if err := json.NewDecoder(r.Body).Decode(&revokeRequest); err != nil {
-		http.Error(w, "couldn't decode revokeRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &revokeRequest, "revokeRequest") {
 		return
 	}
 	err := storage.RevokeMachine(revokeRequest.CN)
@@ -40,8 +39,7 @@ func PostListMachines(w http.ResponseWriter, r *http.Request) {
 
 func PostDeleteMachine(w http.ResponseWriter, r *http.Request) {
 	var deleteRequest protocol.DeleteMachineRequest
-	if err := json.NewDecoder(r.Body).Decode(&deleteRequest); err != nil {
-		http.Error(w, "couldn't decode deleteRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &deleteRequest, "deleteRequest") {
 		return
 	}
 	err := storage.DeleteMachine(deleteRequest.CN)

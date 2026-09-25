@@ -15,8 +15,7 @@ func PostListJobs(w http.ResponseWriter, r *http.Request) {
 
 func PostAdminCancelJob(w http.ResponseWriter, r *http.Request) {
 	var jobRequest protocol.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
-		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &jobRequest, "jobRequest") {
 		return
 	}
 
@@ -39,8 +38,7 @@ func PostAdminCancelJob(w http.ResponseWriter, r *http.Request) {
 
 func PostAdminJobStream(w http.ResponseWriter, r *http.Request) {
 	var jobRequest protocol.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
-		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &jobRequest, "jobRequest") {
 		return
 	}
 

@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
@@ -15,8 +14,7 @@ type flavorApplyRequest struct {
 
 func PostApplyFlavor(w http.ResponseWriter, r *http.Request) {
 	var request flavorApplyRequest
-	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "couldn't decode flavorApplyRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &request, "flavorApplyRequest") {
 		return
 	}
 

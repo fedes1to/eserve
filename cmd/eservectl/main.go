@@ -28,7 +28,7 @@ func printMainUsage() {
 
 func printTokenUsage() {
 	cli.PrintUsage("eservectl token", []cli.Command{
-		{Name: "create", Description: "Creates a token on eserved"},
+		{Name: "create", Description: "Creates a token on eserved (-cn and -flavor bind it)"},
 		{Name: "list", Description: "Lists the tokens on eserved"},
 		{Name: "delete", Description: "Deletes a token on eserved"},
 	})
@@ -107,10 +107,14 @@ func parseTokenFlags() (error, int) {
 
 	switch os.Args[2] {
 	case "create":
+		fs := flag.NewFlagSet("token create", flag.ExitOnError)
+		cn := fs.String("cn", "", "bind the token to this cn, only that machine can enroll with it")
+		flavor := fs.String("flavor", "", "bind the token to this flavor, only that flavor can be enrolled with it")
+		fs.Parse(os.Args[3:])
 		if err := admin.TryConnect(); err != nil {
 			return fmt.Errorf("Can't connect, %w", err), 1
 		}
-		token, err := admin.PostCreateToken()
+		token, err := admin.PostCreateToken(*cn, *flavor)
 		if err != nil {
 			return fmt.Errorf("Couldn't create token, %w", err), 1
 		}
@@ -127,13 +131,13 @@ func parseTokenFlags() (error, int) {
 			fmt.Println("no tokens")
 			return nil, 0
 		}
-		fmt.Printf("%-28s %-16s %-19s %s\n", "TOKEN", "CN", "CREATED", "USED")
+		fmt.Printf("%-28s %-16s %-12s %-19s %s\n", "TOKEN", "CN", "FLAVOR", "CREATED", "USED")
 		for _, token := range list {
 			used := "-"
 			if !token.UsedAt.IsZero() {
 				used = token.UsedAt.Format("2006-01-02 15:04:05")
 			}
-			fmt.Printf("%-28s %-16s %-19s %s\n", token.Token, token.CN, token.CreatedAt.Format("2006-01-02 15:04:05"), used)
+			fmt.Printf("%-28s %-16s %-12s %-19s %s\n", token.Token, token.CN, token.Flavor, token.CreatedAt.Format("2006-01-02 15:04:05"), used)
 		}
 	case "delete":
 		fs := flag.NewFlagSet("token delete", flag.ExitOnError)
