@@ -96,7 +96,10 @@ func getStreamJob(jobID string) (err error) {
 
 	go watchInterrupts(jobID, done)
 
-	return readJobStream(response.Body)
+	if err := readJobStream(response.Body); err != nil {
+		return fmt.Errorf("lost the stream for job %s: %w", jobID, err)
+	}
+	return nil
 }
 
 func postCancelJob(jobID string) error {

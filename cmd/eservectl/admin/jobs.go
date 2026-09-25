@@ -81,7 +81,7 @@ func PostJobStream(id string) (terminal string, success bool, err error) {
 		return finished
 	})
 	if err != nil {
-		return "", false, err
+		return "", false, fmt.Errorf("lost the stream for job %s: %w", id, err)
 	}
 	if !finished {
 		return "", false, fmt.Errorf("stream ended without a terminal event")
