@@ -55,12 +55,13 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	expectedFlavor := machineFlavor
 	var switchToken string
 	var spentAt time.Time
+	var previousCN string
 	if machineFlavor != provisionRequest.Flavor {
 		switchToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		// spent here, before the job touches anything, so a token can't be
 		// reused by a concurrent request and a refused switch has no side effect
 		var err error
-		spentAt, err = storage.SpendFlavorSwitchToken(switchToken, identity.CN, provisionRequest.Flavor)
+		spentAt, previousCN, err = storage.SpendFlavorSwitchToken(switchToken, identity.CN, provisionRequest.Flavor)
 		if err != nil {
 			status := http.StatusUnauthorized
 			if errors.Is(err, storage.ErrTokenCN) || errors.Is(err, storage.ErrTokenFlavor) {
@@ -77,7 +78,7 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// the job never started, so the switch never happened: hand the token back
 		if switchToken != "" {
-			if refundErr := storage.RefundFlavorSwitchToken(switchToken, identity.CN, spentAt); refundErr != nil {
+			if refundErr := storage.RefundFlavorSwitchToken(switchToken, spentAt, previousCN); refundErr != nil {
 				log.Printf("%v: racc couldn't refund the switch token: %v\n", ClientIP(r), refundErr)
 			}
 		}

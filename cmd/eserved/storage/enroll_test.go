@@ -125,11 +125,11 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SpendFlavorSwitchToken(cnBound, "advS3", "advt"); !errors.Is(err, ErrTokenCN) {
+	if _, _, err := SpendFlavorSwitchToken(cnBound, "advS3", "advt"); !errors.Is(err, ErrTokenCN) {
 		t.Errorf("cn-bound token switching another machine: %v", err)
 	}
 	// and the refusal didn't spend it
-	if _, err := SpendFlavorSwitchToken(cnBound, "advS2", "advt"); err != nil {
+	if _, _, err := SpendFlavorSwitchToken(cnBound, "advS2", "advt"); err != nil {
 		t.Fatalf("cn-bound token switching its own machine: %v", err)
 	}
 
@@ -138,20 +138,20 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "advt"); !errors.Is(err, ErrTokenFlavor) {
+	if _, _, err := SpendFlavorSwitchToken(flavorBound, "advS", "advt"); !errors.Is(err, ErrTokenFlavor) {
 		t.Errorf("flavor-bound token switching another flavor: %v", err)
 	}
-	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); err != nil {
+	if _, _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); err != nil {
 		t.Fatalf("flavor-bound token switching its own flavor: %v", err)
 	}
 
 	// a spent token can't be spent again
-	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); !errors.Is(err, ErrTokenUsed) {
+	if _, _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); !errors.Is(err, ErrTokenUsed) {
 		t.Errorf("double spend: %v", err)
 	}
 
 	// an unknown token is refused
-	if _, err := SpendFlavorSwitchToken("nope", "advS", "gnome"); !errors.Is(err, ErrTokenUnknown) {
+	if _, _, err := SpendFlavorSwitchToken("nope", "advS", "gnome"); !errors.Is(err, ErrTokenUnknown) {
 		t.Errorf("unknown token: %v", err)
 	}
 
@@ -160,10 +160,10 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := SpendFlavorSwitchToken(unbound, "advS", "advt"); err != nil {
+	if _, _, err := SpendFlavorSwitchToken(unbound, "advS", "advt"); err != nil {
 		t.Fatalf("unbound token switching: %v", err)
 	}
-	if _, err := SpendFlavorSwitchToken(unbound, "advS3", "advt"); !errors.Is(err, ErrTokenUsed) {
+	if _, _, err := SpendFlavorSwitchToken(unbound, "advS3", "advt"); !errors.Is(err, ErrTokenUsed) {
 		t.Errorf("unbound token spent twice: %v", err)
 	}
 }
@@ -196,14 +196,18 @@ func TestFlavorSwitchRefundAndStaleJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	spentAt, err := SpendFlavorSwitchToken(token, "advS", "advt")
+	spentAt, previousCN, err := SpendFlavorSwitchToken(token, "advS", "advt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RefundFlavorSwitchToken(token, "advS", spentAt); err != nil {
+	if err := RefundFlavorSwitchToken(token, spentAt, previousCN); err != nil {
 		t.Fatalf("refunding a token whose job never started: %v", err)
 	}
-	if _, err := SpendFlavorSwitchToken(token, "advS", "advt"); err != nil {
+	// and it is still bound to its machine, not left unbound for anyone
+	if _, _, err := SpendFlavorSwitchToken(token, "someone-else", "advt"); !errors.Is(err, ErrTokenCN) {
+		t.Errorf("a refunded cn-bound token lost its binding: %v", err)
+	}
+	if _, _, err := SpendFlavorSwitchToken(token, "advS", "advt"); err != nil {
 		t.Fatalf("spending a refunded token: %v", err)
 	}
 
@@ -212,15 +216,15 @@ func TestFlavorSwitchRefundAndStaleJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherAt, err := SpendFlavorSwitchToken(other, "advS", "advt")
+	otherAt, otherCN, err := SpendFlavorSwitchToken(other, "advS", "advt")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := RefundFlavorSwitchToken(other, "advS", otherAt.Add(time.Second)); !errors.Is(err, ErrTokenUsed) {
+	if err := RefundFlavorSwitchToken(other, otherAt.Add(time.Second), otherCN); !errors.Is(err, ErrTokenUsed) {
 		t.Errorf("refunding with a stale stamp: %v", err)
 	}
-	if err := RefundFlavorSwitchToken(other, "someone-else", otherAt); !errors.Is(err, ErrTokenUsed) {
-		t.Errorf("refunding another machine's spend: %v", err)
+	if _, _, err := SpendFlavorSwitchToken(other, "advS", "advt"); !errors.Is(err, ErrTokenUsed) {
+		t.Errorf("a refused refund un-spent the token: %v", err)
 	}
 
 	// a provision queued while the machine was on gnome must not run after a

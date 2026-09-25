@@ -200,39 +200,41 @@ func EnrollMachine(token, cn, flavor, fingerprint string) error {
 
 // the flavor-switch policy: the token must be unspent and, if bound, match the
 // machine and the requested flavor; it is consumed in the same lock as the check,
-// so one token can only ever authorize one switch. Returns the stamp it set, so a
-// caller whose job never started can hand it back to RefundFlavorSwitchToken
-func SpendFlavorSwitchToken(token, cn, flavor string) (time.Time, error) {
+// so one token can only ever authorize one switch. Returns the stamp it set and the
+// cn it replaced, so a caller whose job never started can undo exactly that
+func SpendFlavorSwitchToken(token, cn, flavor string) (spentAt time.Time, previousCN string, err error) {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
 	tokenEntry, exists := tokens.Entries[token]
 	if !exists {
-		return time.Time{}, ErrTokenUnknown
+		return time.Time{}, "", ErrTokenUnknown
 	}
 	if !tokenEntry.UsedAt.UTC().IsZero() {
-		return time.Time{}, ErrTokenUsed
+		return time.Time{}, "", ErrTokenUsed
 	}
 	if tokenEntry.CN != "" && tokenEntry.CN != cn {
-		return time.Time{}, ErrTokenCN
+		return time.Time{}, "", ErrTokenCN
 	}
 	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
-		return time.Time{}, ErrTokenFlavor
+		return time.Time{}, "", ErrTokenFlavor
 	}
 
+	previousCN = tokenEntry.CN
 	tokenEntry.CN = cn
 	tokenEntry.UsedAt = time.Now()
 	tokens.Entries[token] = tokenEntry
 
 	if err := saveTokensLocked(); err != nil {
-		return time.Time{}, err
+		return time.Time{}, "", err
 	}
-	return tokenEntry.UsedAt, nil
+	return tokenEntry.UsedAt, previousCN, nil
 }
 
-// un-spends a token, but only while it is still exactly as the matching spend
-// left it, so a refund can never revive a token another request used
-func RefundFlavorSwitchToken(token, cn string, spentAt time.Time) error {
+// un-spends a token, but only while it is still exactly as the matching spend left
+// it, so a refund can never revive a token another request used. Restoring the cn
+// the spend replaced keeps a bound token bound
+func RefundFlavorSwitchToken(token string, spentAt time.Time, previousCN string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
@@ -240,11 +242,11 @@ func RefundFlavorSwitchToken(token, cn string, spentAt time.Time) error {
 	if !exists {
 		return ErrTokenUnknown
 	}
-	if tokenEntry.CN != cn || !tokenEntry.UsedAt.Equal(spentAt) {
+	if !tokenEntry.UsedAt.Equal(spentAt) {
 		return ErrTokenUsed
 	}
 
-	tokenEntry.CN = ""
+	tokenEntry.CN = previousCN
 	tokenEntry.UsedAt = time.Time{}
 	tokens.Entries[token] = tokenEntry
 
