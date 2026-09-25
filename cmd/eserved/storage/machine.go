@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,9 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
+
+// a lookup by name found nothing; the admin handlers answer 404 for it
+var ErrNotFound = errors.New("not found")
 
 type MachineEntry struct {
 	Subarch     string         `json:"march"`
@@ -70,7 +74,7 @@ func RevokeMachine(cn string) error {
 
 	machineEntry, exists := machines.Entries[cn]
 	if !exists {
-		return fmt.Errorf("Can't revoke non-existant machine %v", cn)
+		return fmt.Errorf("Can't revoke non-existant machine %v: %w", cn, ErrNotFound)
 	}
 
 	machineEntry.RevokedAt = time.Now()
@@ -84,7 +88,7 @@ func DeleteMachine(cn string) error {
 	entry, exists := machines.Entries[cn]
 	if !exists {
 		machinesMutex.Unlock()
-		return fmt.Errorf("can't delete non-existent machine %s", cn)
+		return fmt.Errorf("can't delete non-existent machine %s: %w", cn, ErrNotFound)
 	}
 	delete(machines.Entries, cn)
 	err := saveMachinesLocked()

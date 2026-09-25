@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -38,6 +39,10 @@ func PostDeleteToken(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println("failed to delete token,", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, "failed to delete token, check logs", http.StatusInternalServerError)
 		return
 	}

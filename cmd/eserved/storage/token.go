@@ -149,7 +149,7 @@ func DeleteToken(token string) error {
 	defer tokensMutex.Unlock()
 
 	if _, exists := tokens.Entries[token]; !exists {
-		return fmt.Errorf("can't delete non-existent token %s", token)
+		return fmt.Errorf("can't delete non-existent token %s: %w", token, ErrNotFound)
 	}
 
 	delete(tokens.Entries, token)

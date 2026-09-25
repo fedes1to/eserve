@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,6 +21,10 @@ func PostRevokeMachine(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println("failed to revoke machine,", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, "failed to revoke machine, check logs", http.StatusInternalServerError)
 		return
 	}
@@ -43,6 +48,10 @@ func PostDeleteMachine(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Println("failed to delete machine,", err)
+		if errors.Is(err, storage.ErrNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 		http.Error(w, "failed to delete machine, check logs", http.StatusInternalServerError)
 		return
 	}
