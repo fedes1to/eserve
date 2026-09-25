@@ -61,6 +61,7 @@ func requireClientCert(next http.Handler) http.Handler {
 func serveHTTP(adminEnabled bool) error {
 	steps := []cli.InitStep{
 		{Name: "settings", Function: serverConfig.InitializeServerSettings},
+		{Name: "state permissions", Function: storage.TightenStatePermissions},
 		{Name: "stage", Function: storage.InitializeStageFolder},
 		{Name: "gcc info", Function: chroot.InitializeGccInfo},
 		{Name: "ca certificate", Function: storage.LoadCaCertificate},

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 )
 
 func SafeSaveJsonFile(path string, from any) error {
@@ -48,4 +50,39 @@ func LoadJsonFile[T any](path string, into *T) error {
 		return err
 	}
 	return nil
+}
+
+// state files written before SafeSaveJsonFile got its 0600 keep their old mode
+// until something rewrites them, so bring them back in line
+func TightenMode(path string, mode os.FileMode) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return err
+	}
+	if info.Mode().Perm() == mode.Perm() {
+		return nil
+	}
+	return os.Chmod(path, mode)
+}
+
+// every directory under dir gets dirMode, every regular file fileMode
+func TightenTree(dir string, dirMode, fileMode os.FileMode) error {
+	return filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil
+			}
+			return err
+		}
+		if entry.IsDir() {
+			return TightenMode(path, dirMode)
+		}
+		if entry.Type().IsRegular() {
+			return TightenMode(path, fileMode)
+		}
+		return nil
+	})
 }
