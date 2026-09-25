@@ -8,8 +8,6 @@ type BinaryManifest struct {
 	UploadedAt string `json:"uploaded_at"`
 }
 
-const MaxBinarySize = 512 << 20
-
 type BinaryListResponse struct {
 	Binaries []BinaryManifest `json:"binaries"`
 }

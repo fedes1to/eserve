@@ -2,6 +2,7 @@ package storage
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
@@ -17,6 +19,7 @@ import (
 
 type TokenEntry struct {
 	CN        string    `json:"cn"`
+	Flavor    string    `json:"flavor"`
 	CreatedAt time.Time `json:"created"`
 	UsedAt    time.Time `json:"used"`
 }
@@ -29,6 +32,15 @@ var (
 	tokens      TokensFile
 	tokensMutex sync.RWMutex
 	tokensPath  string = filepath.Join(serverConfig.ServerConfigPath, "tokens.json")
+)
+
+// enrollment refusals, the identity handler maps them to status codes
+var (
+	ErrTokenUnknown        = errors.New("unknown token")
+	ErrTokenUsed           = errors.New("token already used")
+	ErrTokenCN             = errors.New("token not bound to this cn")
+	ErrTokenFlavor         = errors.New("token not bound to this flavor")
+	ErrInvalidTokenBinding = errors.New("invalid token binding")
 )
 
 func LoadTokens() error {
@@ -61,7 +73,16 @@ func loadTokensLocked() error {
 	return nil
 }
 
-func CreateToken() (string, error) {
+// cn and flavor are optional bindings: a bound token only enrolls that machine
+// (the recovery path) and/or that flavor, an unbound one enrolls anything new
+func CreateToken(cn, flavor string) (string, error) {
+	if cn != "" && !validCN(cn) {
+		return "", fmt.Errorf("%w: invalid cn %q", ErrInvalidTokenBinding, cn)
+	}
+	if flavor != "" && !chroot.ValidFlavor(flavor) {
+		return "", fmt.Errorf("%w: invalid flavor %q", ErrInvalidTokenBinding, flavor)
+	}
+
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
@@ -70,9 +91,7 @@ func CreateToken() (string, error) {
 	if _, tokenExists := tokens.Entries[token]; tokenExists {
 		return "", fmt.Errorf("Token already exists... You just stumbled on something almost impossible, or something is really fucked with your PC, Bye!")
 	}
-	entry := tokens.Entries[token]
-	entry.CreatedAt = time.Now()
-	tokens.Entries[token] = entry
+	tokens.Entries[token] = TokenEntry{CN: cn, Flavor: flavor, CreatedAt: time.Now()}
 
 	return token, saveTokensLocked()
 }
@@ -91,21 +110,17 @@ func isTokenAvailableLocked(token string) bool {
 		return false
 	}
 
-	// a used token is one-shot: if its CN is already enrolled, its spent
-	if tokenToCheck.CN != "" || !tokenToCheck.UsedAt.UTC().IsZero() {
-		machinesMutex.RLock()
-		_, machineExists := machines.Entries[tokenToCheck.CN]
-		machinesMutex.RUnlock()
-		if machineExists {
-			return false
-		}
-	}
-	return true
+	// a used token is spent, whatever happened to its machine since
+	return tokenToCheck.UsedAt.UTC().IsZero()
 }
 
 // the cn ends up in file names and logs, so keep it boring: no dots at the
 // edges, no control characters, no unicode
 var cnPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9_-])?$`)
+
+func validCN(cn string) bool {
+	return len(cn) > 0 && len(cn) <= 64 && cnPattern.MatchString(cn)
+}
 
 func ValidCN(token string, cn string) bool {
 	tokensMutex.RLock()
@@ -115,7 +130,7 @@ func ValidCN(token string, cn string) bool {
 	if !exists {
 		return false
 	}
-	if len(cn) == 0 || len(cn) > 64 || !cnPattern.MatchString(cn) {
+	if !validCN(cn) {
 		return false
 	}
 
@@ -129,18 +144,17 @@ func UseToken(token string, cn string) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
-	if entry, ok := tokens.Entries[token]; ok && (entry.CN != "" || !entry.UsedAt.UTC().IsZero()) {
-		return fmt.Errorf("token already used")
+	tokenToUse, exists := tokens.Entries[token]
+	if !exists {
+		return ErrTokenUnknown
 	}
-
-	if !isTokenAvailableLocked(token) {
-		return fmt.Errorf("Token became invalid at usage")
+	if !tokenToUse.UsedAt.UTC().IsZero() {
+		return ErrTokenUsed
 	}
-
-	tokenToUse := tokens.Entries[token]
 	if tokenToUse.CN != "" && tokenToUse.CN != cn {
-		return fmt.Errorf("token not valid for machine")
+		return ErrTokenCN
 	}
+
 	tokenToUse.CN = cn
 	tokenToUse.UsedAt = time.Now()
 	tokens.Entries[token] = tokenToUse
@@ -170,6 +184,7 @@ func ListTokens() []protocol.TokenInfo {
 		list = append(list, protocol.TokenInfo{
 			Token:     token,
 			CN:        entry.CN,
+			Flavor:    entry.Flavor,
 			CreatedAt: entry.CreatedAt,
 			UsedAt:    entry.UsedAt,
 		})

@@ -18,8 +18,14 @@ type MachineListResponse struct {
 type TokenInfo struct {
 	Token     string    `json:"token"`
 	CN        string    `json:"cn"`
+	Flavor    string    `json:"flavor"`
 	CreatedAt time.Time `json:"created"`
 	UsedAt    time.Time `json:"used"`
+}
+
+type CreateTokenRequest struct {
+	CN     string `json:"cn"`
+	Flavor string `json:"flavor"`
 }
 
 type TokenListResponse struct {

@@ -150,14 +150,46 @@ func MachineExists(cn string) bool {
 	return exists
 }
 
-func UpsertMachine(cn, fingerprint, flavor string) error {
+// an unbound token may enroll a new machine, never take over a registered one
+var ErrMachineTaken = errors.New("machine already registered, use a token bound to this cn")
+
+// consumes the token and registers the machine under one lock, so two identities
+// racing for the same cn can't both win
+func EnrollMachine(token, cn, flavor, fingerprint string) error {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
-	entry := machines.Entries[cn]
-	entry.Fingerprint = fingerprint
-	entry.Flavor = flavor
-	machines.Entries[cn] = entry
+	tokenEntry, exists := tokens.Entries[token]
+	if !exists {
+		return ErrTokenUnknown
+	}
+	if !tokenEntry.UsedAt.UTC().IsZero() {
+		return ErrTokenUsed
+	}
+	if tokenEntry.CN != "" && tokenEntry.CN != cn {
+		return ErrTokenCN
+	}
+	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
+		return ErrTokenFlavor
+	}
+	if _, machineExists := machines.Entries[cn]; machineExists && tokenEntry.CN != cn {
+		return ErrMachineTaken
+	}
+
+	tokenEntry.CN = cn
+	tokenEntry.UsedAt = time.Now()
+	tokens.Entries[token] = tokenEntry
+	if err := saveTokensLocked(); err != nil {
+		return err
+	}
+
+	// an existing entry keeps its subarch/profile/revocation, only the cert changes
+	machineEntry := machines.Entries[cn]
+	machineEntry.Fingerprint = fingerprint
+	machineEntry.Flavor = flavor
+	machines.Entries[cn] = machineEntry
 	return saveMachinesLocked()
 }
 
