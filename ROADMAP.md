@@ -24,11 +24,14 @@ Simple roadmap to check progress/features
 - machine/token delete + health endpoint + OpenRC service (pidfile, boot start)
 - second VM (epuller) on the full steady state, signed consumption there
 - build flavor builds the init system (user-tuned package.use drop-ins)
-- crossdev support (cross.conf per flavor, toolchain sdk + per-package staging via crossdev)
+- crossdev support (cross.conf per flavor, toolchain sdk via crossdev, target binpkgs from the sysroot emerge wrapper)
 
 ## TODO (atm)
 - the gnome flavor's stored sync is stale by design, re-sync it when the flavor is used again
 - almost everything cuh
+
+## PLANNED
+- other distros/os' maybe?
 
 ## NOT GOING TO BE IMPLEMENTED
 - fail2ban / rate limits
