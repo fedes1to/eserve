@@ -26,12 +26,12 @@ The same rule covers switching a machine onto an existing flavor (`eservectl tok
 
 1. `eservectl token create` — one-shot token (`-flavor <name>` to join a flavor that already exists)
 2. `epull register -token <t> -server https://host:8080 -flavor <name> -stage <stage3file>` — pins the CA, identifies, provisions the flavor, imports the server's signing key
-3. `epull sync` — uploads the client's portage config; the server layers it under the flavor's own config
+3. `epull sync` — uploads the client's portage config; the server layers it **on top of** the flavor's own config (the client wins file-by-file, except `make.conf`, which the flavor always wins)
 4. `eservectl build start -flavor <name> -package <cat/pkg>` — admin-triggered build in a bwrap sandbox (plain chroot fallback), streamed live
 5. the server publishes signed gpkgs to the binhost at `/pkgs/<flavor>/`, which clients consume with portage
 6. `epull selfupdate` — replaces itself with the server-hosted build
 
-## Build
+## Build (run on the eserver VM — nothing is built or run on the dev box)
 
 ```sh
 go build ./...
