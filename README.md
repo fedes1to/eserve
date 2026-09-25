@@ -13,9 +13,18 @@ Gentoo-only for now. Pure Go, stdlib only, no external dependencies.
 
 An admin mints a single-use bearer token over the unix socket. `epull` spends it once to POST a CSR and get a 1-year client cert signed by the server's CA; every request after that is mTLS, and the server checks the cert's CN + fingerprint against `machines.json`. Revocation is sticky. `epull` pins the server CA on first register, so steady state needs no `-insecure`.
 
+A token can be bound to a CN and/or a flavor: `eservectl token create -cn <name> -flavor <name>`. **Joining a flavor that already exists needs a token bound to that flavor** — a flavor exists once it has a provisioned chroot, a machine on it, or a `flavors/<name>/` config dir, and an unbound token can only start a brand-new one (a fresh chroot nobody else is on). So adding a machine to an existing flavor is:
+
+```sh
+eservectl token create -flavor build
+epull register -token <t> -server https://host:8080 -flavor build -stage <stage3file>
+```
+
+The same rule covers switching a machine onto an existing flavor (`eservectl token create -cn <name> -flavor <name>`), and the refusal is a 400 that names the command. A CN-bound token is the recovery path for a machine that lost its certs.
+
 ## The loop
 
-1. `eservectl token create` — one-shot token
+1. `eservectl token create` — one-shot token (`-flavor <name>` to join a flavor that already exists)
 2. `epull register -token <t> -server https://host:8080 -flavor <name> -stage <stage3file>` — pins the CA, identifies, provisions the flavor, imports the server's signing key
 3. `epull sync` — uploads the client's portage config; the server layers it under the flavor's own config
 4. `eservectl build start -flavor <name> -package <cat/pkg>` — admin-triggered build in a bwrap sandbox (plain chroot fallback), streamed live

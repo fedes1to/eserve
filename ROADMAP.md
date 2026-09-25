@@ -25,9 +25,12 @@ Simple roadmap to check progress/features
 - second VM (epuller) on the full steady state, signed consumption there
 - build flavor builds the init system (user-tuned package.use drop-ins)
 - crossdev support (cross.conf per flavor, toolchain sdk via crossdev, target binpkgs from the sysroot emerge wrapper)
+- flavor-bound tokens required to join an existing flavor (identity + flavor switch), clear 400 naming the fix
+- switch-token refund when the job never started or failed before the switch was written
+- startup tightening of the legacy state file modes (settings.json, sync/**, jobs/, the keys)
+- the chroot's make.profile follows the client's profile (admin override, else the last provisioner/syncer), so binpkgs are actually usable
 
 ## TODO (atm)
-- the gnome flavor's stored sync is stale by design, re-sync it when the flavor is used again
 - almost everything cuh
 
 ## PLANNED
