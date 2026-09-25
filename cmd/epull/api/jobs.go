@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -72,7 +73,7 @@ func watchInterrupts(jobID string, done <-chan struct{}) {
 		// cancel async so the stream keeps printing
 		go func() {
 			if err := postCancelJob(jobID); err != nil {
-				fmt.Fprintln(os.Stderr, "racc failed to cancel job:", err)
+				log.Println("racc failed to cancel job:", err)
 			}
 		}()
 

@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -91,7 +90,7 @@ func serveHTTP(adminEnabled bool) error {
 
 		go func() {
 			if err := adminServer.Serve(unixSocket); err != nil {
-				fmt.Fprintln(os.Stderr, "Failed to serve admin socket,", err)
+				log.Println("Failed to serve admin socket,", err)
 			}
 		}()
 	}

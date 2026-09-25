@@ -91,7 +91,7 @@ func postIdentification(token string, server string, flavor string, insecure boo
 
 	validUntil, err := time.Parse(time.RFC3339, identificationResponse.ValidUntil)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Couldn't parse valid_until field,", err)
+		log.Println("Couldn't parse valid_until field,", err)
 	} else {
 		daysLeft := time.Until(validUntil).Hours() / 24
 		if daysLeft < 30 {
