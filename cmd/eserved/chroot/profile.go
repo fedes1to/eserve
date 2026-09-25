@@ -19,13 +19,17 @@ type Profile struct {
 	GccMachine string
 }
 
-func IsGccMachineDiff(clientGccMachine string) bool {
-	if clientGccMachine == "" || serverGccMachine == "" {
-		return false // nothing to compare, not a different arch
+// the arch and the os/libc tail of a CHOST, with the vendor dropped: x86_64-pc-linux-gnu
+// and x86_64-unknown-linux-gnu are the same target, x86_64-pc-linux-musl is not
+func chostTarget(chost string) (arch, tail string) {
+	fields := strings.Split(chost, "-")
+	if len(fields) < 2 {
+		return chost, ""
 	}
-	clientArch, _, _ := strings.Cut(clientGccMachine, "-")
-	serverArch, _, _ := strings.Cut(serverGccMachine, "-")
-	return clientArch != serverArch
+	if len(fields) >= 4 {
+		return fields[0], strings.Join(fields[2:], "-") // arch-vendor-os-libc
+	}
+	return fields[0], strings.Join(fields[1:], "-") // arch-os-libc
 }
 
 func InitializeGccInfo() error {

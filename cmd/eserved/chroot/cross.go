@@ -52,7 +52,8 @@ func CrossTarget(flavor string) (string, bool) {
 
 // why a client can't provision into this flavor, "" when it can. a cross flavor
 // serves exactly its target's CHOST (a client with a different triple can't
-// install the binpkgs it builds), a native one serves the server's arch
+// install the binpkgs it builds), a native one serves the server's own CHOST —
+// same arch and same os/libc, the vendor doesn't matter
 func ArchRefusal(flavor, clientGccMachine string) string {
 	if target, ok := CrossTarget(flavor); ok {
 		if clientGccMachine != "" && target != clientGccMachine {
@@ -60,10 +61,15 @@ func ArchRefusal(flavor, clientGccMachine string) string {
 		}
 		return ""
 	}
-	if IsGccMachineDiff(clientGccMachine) {
-		return fmt.Sprintf("cross arch %s not supported for flavor %s, choose a flavor for %s or the same arch as eserved", clientGccMachine, flavor, clientGccMachine)
+	if clientGccMachine == "" || serverGccMachine == "" {
+		return ""
 	}
-	return ""
+	clientArch, clientTail := chostTarget(clientGccMachine)
+	serverArch, serverTail := chostTarget(serverGccMachine)
+	if clientArch == serverArch && clientTail == serverTail {
+		return ""
+	}
+	return fmt.Sprintf("flavor %s builds for %s, this machine is %s; use a cross flavor for %s", flavor, serverGccMachine, clientGccMachine, clientGccMachine)
 }
 
 // the cross dev sdk marker, same convention as the repo marker
