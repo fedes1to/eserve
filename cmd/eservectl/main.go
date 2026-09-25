@@ -86,25 +86,39 @@ func printBinaryUsage() {
 	os.Exit(2)
 }
 
+// -help after the subcommand must work without a server, and a usage error is 2
+func helpRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "-help" || arg == "--help" || arg == "-h" {
+			return true
+		}
+	}
+	return false
+}
+
 func parseTokenFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") ||
 		(os.Args[2] != "create" && os.Args[2] != "list" && os.Args[2] != "delete") {
 		printTokenUsage()
 	}
-
-	err := admin.TryConnect()
-	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 1
+	if helpRequested(os.Args[3:]) {
+		printTokenUsage()
 	}
 
 	switch os.Args[2] {
 	case "create":
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		token, err := admin.PostCreateToken()
 		if err != nil {
 			return fmt.Errorf("Couldn't create token, %w", err), 1
 		}
 		log.Println("New token:", token)
 	case "list":
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		list, err := admin.PostListTokens()
 		if err != nil {
 			return fmt.Errorf("Couldn't list tokens, %w", err), 1
@@ -128,8 +142,10 @@ func parseTokenFlags() (error, int) {
 		if *token == "" {
 			return fmt.Errorf("-token flag is required"), 2
 		}
-		err = admin.PostDeleteToken(*token)
-		if err != nil {
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
+		if err := admin.PostDeleteToken(*token); err != nil {
 			return fmt.Errorf("Couldn't delete token, %w", err), 1
 		}
 	}
@@ -140,6 +156,9 @@ func parseTokenFlags() (error, int) {
 func parseStageFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") ||
 		(os.Args[2] != "download" && os.Args[2] != "install" && os.Args[2] != "list") {
+		printStageUsage()
+	}
+	if helpRequested(os.Args[3:]) {
 		printStageUsage()
 	}
 
@@ -189,10 +208,8 @@ func parseMachineFlags() (error, int) {
 		(os.Args[2] != "revoke" && os.Args[2] != "list" && os.Args[2] != "delete") {
 		printMachineUsage()
 	}
-
-	err := admin.TryConnect()
-	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 1
+	if helpRequested(os.Args[3:]) {
+		printMachineUsage()
 	}
 
 	switch os.Args[2] {
@@ -203,11 +220,16 @@ func parseMachineFlags() (error, int) {
 		if *cn == "" {
 			return fmt.Errorf("-cn flag is required"), 2
 		}
-		err = admin.PostRevokeMachine(*cn)
-		if err != nil {
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
+		if err := admin.PostRevokeMachine(*cn); err != nil {
 			return fmt.Errorf("Couldn't revoke machine, %w", err), 1
 		}
 	case "list":
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		list, err := admin.PostListMachines()
 		if err != nil {
 			return fmt.Errorf("Couldn't list machines, %w", err), 1
@@ -231,8 +253,10 @@ func parseMachineFlags() (error, int) {
 		if *cn == "" {
 			return fmt.Errorf("-cn flag is required"), 2
 		}
-		err = admin.PostDeleteMachine(*cn)
-		if err != nil {
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
+		if err := admin.PostDeleteMachine(*cn); err != nil {
 			return fmt.Errorf("Couldn't delete machine, %w", err), 1
 		}
 	}
@@ -245,14 +269,15 @@ func parseJobFlags() (error, int) {
 		(os.Args[2] != "list" && os.Args[2] != "cancel" && os.Args[2] != "stream") {
 		printJobUsage()
 	}
-
-	err := admin.TryConnect()
-	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 1
+	if helpRequested(os.Args[3:]) {
+		printJobUsage()
 	}
 
 	switch os.Args[2] {
 	case "list":
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		list, err := admin.PostListJobs()
 		if err != nil {
 			return err, 1
@@ -272,6 +297,9 @@ func parseJobFlags() (error, int) {
 		if *id == "" {
 			return fmt.Errorf("-id flag is required"), 2
 		}
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		if err := admin.PostCancelJob(*id); err != nil {
 			return err, 1
 		}
@@ -282,6 +310,9 @@ func parseJobFlags() (error, int) {
 		fs.Parse(os.Args[3:])
 		if *id == "" {
 			return fmt.Errorf("-id flag is required"), 2
+		}
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
 		}
 		_, success, err := admin.PostJobStream(*id)
 		if err != nil {
@@ -311,10 +342,8 @@ func parseBuildFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") || os.Args[2] != "start" {
 		printBuildUsage()
 	}
-
-	err := admin.TryConnect()
-	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 1
+	if helpRequested(os.Args[3:]) {
+		printBuildUsage()
 	}
 
 	fs := flag.NewFlagSet("build start", flag.ExitOnError)
@@ -327,6 +356,9 @@ func parseBuildFlags() (error, int) {
 	}
 	if len(packages) == 0 {
 		return fmt.Errorf("at least one -package flag is required"), 2
+	}
+	if err := admin.TryConnect(); err != nil {
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	jobID, err := admin.PostStartBuild(*flavor, packages)
@@ -363,18 +395,20 @@ func parseFlavorFlags() (error, int) {
 			mode, args = "create", args[1:]
 		}
 	}
+	if helpRequested(args) {
+		printFlavorUsage()
+	}
 
 	switch mode {
 	case "apply":
-		err := admin.TryConnect()
-		if err != nil {
-			return fmt.Errorf("Can't connect, %w", err), 1
-		}
 		fs := flag.NewFlagSet("flavor apply", flag.ExitOnError)
 		flavor := fs.String("flavor", "", "flavor to apply the config to")
 		fs.Parse(args)
 		if *flavor == "" {
 			return fmt.Errorf("-flavor flag is required"), 2
+		}
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
 		}
 		if err := admin.PostApplyFlavor(*flavor); err != nil {
 			return err, 1
@@ -426,10 +460,8 @@ func parseBinaryFlags() (error, int) {
 		(os.Args[2] != "upload" && os.Args[2] != "list") {
 		printBinaryUsage()
 	}
-
-	err := admin.TryConnect()
-	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 1
+	if helpRequested(os.Args[3:]) {
+		printBinaryUsage()
 	}
 
 	switch os.Args[2] {
@@ -442,11 +474,17 @@ func parseBinaryFlags() (error, int) {
 		if *name == "" || *arch == "" || *path == "" {
 			return fmt.Errorf("-name, -arch and -file flags are required"), 2
 		}
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		if err := admin.PostUploadBinary(*name, *arch, *path); err != nil {
 			return err, 1
 		}
 		fmt.Printf("uploaded %s for %s\n", *name, *arch)
 	case "list":
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
 		list, err := admin.PostListBinaries()
 		if err != nil {
 			return err, 1
