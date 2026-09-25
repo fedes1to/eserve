@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,6 +15,10 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
+
+// a cancelled job is a clean stop, but the caller must not run the post-provision
+// side effects for a switch that never committed
+var errJobCancelled = errors.New("job cancelled")
 
 // done and cancelled are clean stops, error is a failure; the job's error has to
 // come back out, or a failed provision looks like a success to the caller
@@ -35,8 +40,10 @@ func readJobStream(body io.Reader) error {
 func handleStreamEvent(eventType, message string) (bool, error) {
 	fmt.Println(protocol.Colorize(protocol.StreamEvent{Type: eventType, Message: message}))
 	switch eventType {
-	case "done", "cancelled":
+	case "done":
 		return true, nil // clean stop
+	case "cancelled":
+		return true, errJobCancelled
 	case "error":
 		return true, fmt.Errorf("racc's job ended with an error: %s", message)
 	}

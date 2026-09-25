@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,6 +38,11 @@ func SetupGpgKey(armored string) error {
 	trustCmd.Stdin = strings.NewReader(fingerprint + ":6:\n")
 	if output, err := trustCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("gpg ownertrust failed: %w: %s", err, output)
+	}
+	// gpg autostarts an agent that daemonizes and outlives us (inside a chroot it
+	// keeps the chroot busy); nothing here needs it once the key is imported
+	if output, err := exec.Command("gpgconf", "--homedir", gpgHome, "--kill", "gpg-agent").CombinedOutput(); err != nil {
+		log.Printf("couldn't stop gpg-agent: %v: %s", err, output)
 	}
 	return upsertMakeConfLines(PortageConfigRoot+"/make.conf", verifyMakeConfLines)
 }

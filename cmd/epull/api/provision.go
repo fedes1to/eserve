@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"log"
 	"net/http"
 
@@ -43,6 +44,11 @@ func postProvisioning(flavor, stage, token string) error {
 	}
 
 	if err = getStreamJob(provisionResponse.JobID); err != nil {
+		if errors.Is(err, errJobCancelled) {
+			// the switch never committed, so nothing here may touch the client's config
+			log.Println("job cancelled, leaving the client's config alone")
+			return nil
+		}
 		return err
 	}
 
