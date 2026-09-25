@@ -62,8 +62,12 @@ type Job struct {
 	finishedAt time.Time
 }
 
+func jobsDir() string {
+	return filepath.Join(serverConfig.ServerConfigPath, "jobs")
+}
+
 func (j *Job) logPath() string {
-	return filepath.Join(serverConfig.ServerConfigPath, "jobs", j.ID+".jsonl")
+	return filepath.Join(jobsDir(), j.ID+".jsonl")
 }
 
 func (j *Job) Write(event protocol.StreamEvent) {
@@ -317,12 +321,12 @@ func (r *JobRegistry) Start(cn, flavor, kind string, work func(ctx context.Conte
 		return nil, err
 	}
 
-	jobsDir := filepath.Join(serverConfig.ServerConfigPath, "jobs")
-	if err := os.MkdirAll(jobsDir, 0755); err != nil {
+	dir := jobsDir()
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
 
-	logFile, err := os.Create(filepath.Join(jobsDir, id+".jsonl"))
+	logFile, err := os.OpenFile(filepath.Join(dir, id+".jsonl"), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -463,6 +467,27 @@ func (r *JobRegistry) janitor() {
 	for range ticker.C {
 		r.cleanup()
 	}
+}
+
+// a restart leaves the logs of jobs that were running; nothing in memory can reference them
+func SweepStaleLogs() error {
+	dir := jobsDir()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		if err := os.Remove(filepath.Join(dir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func newJobID() (string, error) {

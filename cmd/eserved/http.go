@@ -15,6 +15,7 @@ import (
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/cli"
@@ -59,6 +60,7 @@ func serveHTTP(adminEnabled bool) error {
 		{Name: "tokens", Function: storage.LoadTokens},
 		{Name: "machines", Function: storage.LoadMachines},
 		{Name: "signing key", Function: gpg.EnsureKey},
+		{Name: "job logs", Function: jobs.SweepStaleLogs},
 	}
 	if err := cli.MustInit(steps); err != nil {
 		return err
