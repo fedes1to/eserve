@@ -16,31 +16,34 @@ go build ./...                  # build everything (no Makefile, no CI, no task 
 go build -o eserved ./cmd/eserved
 go build -o epull ./cmd/epull
 go build -o eservectl ./cmd/eservectl
-go test ./...                   # passes trivially — there are NO test files in the tree
+go test ./...                   # one test file, see below
 go vet ./...
 ```
 
-There is no linter/formatter config in the repo; `gofmt`/`go vet` are the only tooling.
+There is no linter/formatter config in the repo; `gofmt`/`go vet` are the only tooling. There is exactly **one** test file — `cmd/eserved/storage/enroll_test.go`, the enrollment policy (an unbound token enrolls a new CN only, a CN/flavor-bound token recovers its own machine, spent tokens, takeover refusal, sticky revocation, binding validation); it redirects the storage paths into `t.TempDir()`, so it never touches `/etc/eserved`. No test framework, no CI.
 
 **Running requires root.** Config paths are hardcoded (`/etc/eserved`, `/etc/epull`) and `InitConfigPath` calls `log.Fatalln` if it can't create the config directory. There is no env override.
 
-Typical flow: start `eserved` (first run auto-generates `/etc/eserved/settings.json` with defaults, a CA, and a server cert **signed by that CA** — SANs = `eserver` + every non-loopback IPv4 on the host) → `eservectl token create` → `epull register -token <t> -server https://host:8080 -flavor <name> -stage <stage3file>`. Register pins the server CA automatically on first run (open `/api/v1/ca` → `/etc/epull/ca.crt`), so steady state is verified — no `-insecure` needed (the flag remains as a fallback when pinning isn't possible, e.g. an older server). Plain-https clients (portage) can verify the server cert by trusting the eserved CA in their system store.
+Typical flow: start `eserved` (first run auto-generates `/etc/eserved/settings.json` with defaults, a CA, and a server cert **signed by that CA** — SANs = `eserver` + every non-loopback IPv4 on the host) → `eservectl token create` → `epull register -token <t> -server https://host:8080 -flavor <name> -stage <stage3file>`. `eservectl token create [-cn <name>] [-flavor <name>]` binds the token to a CN and/or a flavor (see the trust model); `eservectl token list` shows the CN and FLAVOR columns. Register pins the server CA automatically on first run (open `/api/v1/ca` → `/etc/epull/ca.crt`), so steady state is verified — no `-insecure` needed (the flag remains as a fallback when pinning isn't possible, e.g. an older server). Plain-https clients (portage) can verify the server cert by trusting the eserved CA in its system store.
 
 ## Architecture
 
 ### Trust model (understand this first)
 
 1. **Bootstrap**: admin creates a single-use bearer token via the unix socket.
-2. **Identity** (`POST /api/v1/identity`, the only endpoint without a client cert): `epull` generates an ed25519 keypair + CSR (CN = hostname) and POSTs it with the token. The server signs a 1-year client cert, records the machine keyed by CN with `sha256(cert.Raw)` as fingerprint, and consumes the token.
+2. **Identity** (`POST /api/v1/identity`, the only endpoint without a client cert): `epull` generates an ed25519 keypair + CSR (CN = hostname) and POSTs it with the token. The server verifies the CSR signature, validates the flavor with `chroot.ValidFlavor`, signs a 1-year client cert, records the machine keyed by CN with `sha256(cert.Raw)` as fingerprint, and consumes the token. **A token can be bound to a CN and/or a flavor at creation** (`eservectl token create -cn <name> -flavor <name>`). A CN-bound token is the only way to re-enroll an already-registered CN (the recovery path after losing the certs); an unbound token can only enroll a **new** CN and can never take over a registered machine (409 `machine already registered, use a token bound to this cn`). The token is consumed and the machine upserted under one lock (`storage.EnrollMachine`), so two identities racing for the same CN cannot both win.
 3. **mTLS afterwards**: `requireClientCert` (cmd/eserved/http.go:23) validates CN + fingerprint against `machines.json` and rejects revoked machines, then puts a `ClientIdentity` in the request context.
 
 Non-obvious details:
 
 - The TLS config uses `tls.RequestClientCert`, **not** `Required` — enforcement is per-route via `requireClientCert` in the mux setup, so new protected endpoints must be wrapped explicitly.
 - Both sides enforce TLS 1.3 minimum.
+- Client certs are checked for expiry in `requireClientCert` (`NotAfter` in the past → 401) because the TLS config uses `tls.RequestClientCert` and Go never validates the peer cert for us.
+- Every request body the server decodes is capped (`protocol.MaxJSONBodySize` 64 KiB for JSON handlers, `protocol.MaxBinarySize` 512 MiB for the binary upload, 64 MiB for the sync archive) and an oversized body gets a 413.
+- An unbound token still lets its holder pick any flavor and any *new* CN, so bind both for anything that is not a first-time enrollment.
 - **Tokens are one-shot** (single identity, or single flavor-switch during provision). New tokens via `eservectl token create`. `isTokenAvailableLocked` treats a used token with an existing machine as unavailable.
 - **Revocation is sticky**: `eservectl machine revoke -cn <name>` sets `RevokedAt`; neither re-identifying nor re-provisioning clears it, and there is no un-revoke endpoint.
-- Flavor is used as a chroot **directory name** — no slashes/spaces/dots. `chroot.ValidFlavor` enforces this anywhere a flavor reaches the filesystem (provision, sync, build, publish), and `storage.ValidCN` gives the machine CN the same rules (it's the client-controlled identifier that ends up in the sync archive's file name).
+- Flavor is used as a chroot **directory name** — no slashes/spaces/dots. `chroot.ValidFlavor` enforces this anywhere a flavor reaches the filesystem (provision, sync, build, publish), and `storage`'s `cnPattern`/`validCN` gives the machine CN the same rules (it's the client-controlled identifier that ends up in the sync archive's file name).
 
 ### HTTP surface
 
@@ -48,7 +51,7 @@ Admin API on unix socket `/run/eserved.sock` (chmod 600; disabled entirely with 
 
 Public API on TLS at `settings.json` `listen_addr` (default `127.0.0.1:8080`), all routes in `internal/urls/api.go`:
 
-- `/api/v1/identity` — bootstrap (no client cert)
+- `/api/v1/identity` — bootstrap (no client cert): body capped at 64 KiB, the CSR signature is verified, the flavor must pass `chroot.ValidFlavor`, and a token bound to a CN/flavor must match
 - `/api/v1/health` — open (no client cert), plain `ok` on 200, for service monitoring
 - `/api/v1/ca` — open (no client cert): the eserved CA in PEM; epull pins it on first register and verifies against it after
 - `/api/v1/provision` — 202 + `{job_id, binhost_url, flavor}`; switching flavor requires a fresh bearer token. `binhost_url` is per-flavor (`<base_binhost_url>/<flavor>`)
@@ -115,6 +118,7 @@ State in `/etc/epull/`: `settings.json` (server URL + cert/key paths), `<hostnam
 Other things that will bite:
 
 - The identity context value is asserted directly (`r.Context().Value(api.CtxKeyIdentity).(ClientIdentity)`) — the key is a typed constant (`type ctxKey string`) so other code can't collide with it, but the value assertion has no compile-time safety.
+- The machine CN charset is `^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9_-])?$` (≤64 chars) — it is client-controlled and ends up in file names, so `storage`'s `cnPattern`/`validCN` gates it at identity and token creation. State files under `/etc/eserved/` are written 0600.
 - `epull register` takes `-stage <file>` for non-interactive use; without it it falls back to the interactive prompt (blocks without a tty; the final sync check swallows the EOF and only warns).
 - `eserved` has only one flag (`-admin`); everything else (listen addr, paths) is in `settings.json`.
 - The binhost is **signed**: gpkgs carry GPG signatures **embedded in the gpkg tar** (`metadata.tar.zst.sig`, `image.tar.zst.sig`), made by the passphraseless ed25519 key in `/etc/eserved/gnupg` (generated with `%no-protection` by `internal/gpg`; the chroot copies that whole dir and signs at build time). Clients verify against the key epull pinned in `/etc/epull/gnupg` — the client `make.conf` gets `BINPKG_GPG_VERIFY_*` + `GPG_VERIFY_USER_DROP=""` (portage drops verify to `nobody` by default, which can't read the root-only keyring), and the binrepo section says `verify-signature = true`. Signing is gated by the `binpkg-signing` feature (portage 3.0.81); `openpgp-key-package` is still unused.
