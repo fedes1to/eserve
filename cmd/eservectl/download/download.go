@@ -45,7 +45,6 @@ func printDownloadPercent(done chan int64, path string, total int64) {
 
 		size, now := fi.Size(), time.Now()
 
-		// bytes since last tick -> speed
 		if dt := now.Sub(prevTime).Seconds(); dt > 0 && size >= prevSize {
 			speed = float64(size-prevSize) / dt
 		}

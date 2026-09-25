@@ -24,7 +24,6 @@ import (
 )
 
 func postIdentification(token string, server string, flavor string, insecure bool) error {
-	// making the certs and CSR
 	_, privKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return err

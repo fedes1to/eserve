@@ -12,7 +12,6 @@ import (
 
 func parseRegister() (error, int) {
 	fs := flag.NewFlagSet("register", flag.ExitOnError)
-	// registration
 	token := fs.String("token", "", "[REQUIRED FOR REGISTER], Token for registration")
 	server := fs.String("server", "", "[REQUIRED FOR REGISTER] Address where eserve is running")
 	flavor := fs.String("flavor", "", "Flavor name used on provisioning, will default to hostname")

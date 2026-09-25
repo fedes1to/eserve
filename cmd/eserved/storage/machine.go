@@ -24,7 +24,6 @@ type MachineEntry struct {
 	RevokedAt   time.Time      `json:"revoked_at"` // IsZero if not revoked
 }
 
-// we still address by tokens here, thats the GUID we will use internally
 type MachinesFile struct {
 	Entries map[string]MachineEntry `json:"machines"`
 }

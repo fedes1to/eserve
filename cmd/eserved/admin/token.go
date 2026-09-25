@@ -1,6 +1,5 @@
 package admin
 
-// used for eservectl comms
 import (
 	"encoding/json"
 	"fmt"
