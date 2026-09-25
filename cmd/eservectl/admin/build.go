@@ -19,13 +19,17 @@ func PostStartBuild(flavor string, packages []string) (string, error) {
 	}
 	defer response.Body.Close()
 
-	var buildResponse protocol.BuildResponse
-	if err := json.NewDecoder(response.Body).Decode(&buildResponse); err != nil {
-		bodyBytes, _ := io.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
+	}
+	if response.StatusCode != 200 {
 		return "", fmt.Errorf("couldn't start build, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
 	}
-	if response.StatusCode != 200 || buildResponse.JobID == "" {
-		return "", fmt.Errorf("couldn't start build, code %v", response.StatusCode)
+
+	var buildResponse protocol.BuildResponse
+	if err := json.Unmarshal(bodyBytes, &buildResponse); err != nil || buildResponse.JobID == "" {
+		return "", fmt.Errorf("couldn't start build, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
 	}
 	return buildResponse.JobID, nil
 }

@@ -39,12 +39,14 @@ func PostListMachines() ([]protocol.MachineInfo, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(response.Body)
+		return nil, fmt.Errorf("couldn't list machines, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
+	}
+
 	var list protocol.MachineListResponse
 	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
 		return nil, err
-	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("couldn't list machines, code %v", response.StatusCode)
 	}
 	return list.Machines, nil
 }

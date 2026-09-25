@@ -82,12 +82,14 @@ func PostListBinaries() (protocol.BinaryListResponse, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(response.Body)
+		return protocol.BinaryListResponse{}, fmt.Errorf("couldn't list binaries, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
+	}
+
 	var list protocol.BinaryListResponse
 	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
 		return protocol.BinaryListResponse{}, err
-	}
-	if response.StatusCode != 200 {
-		return protocol.BinaryListResponse{}, fmt.Errorf("couldn't list binaries, code %v", response.StatusCode)
 	}
 	return list, nil
 }

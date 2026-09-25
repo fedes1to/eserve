@@ -19,12 +19,14 @@ func PostListJobs() (protocol.JobListResponse, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(response.Body)
+		return protocol.JobListResponse{}, fmt.Errorf("couldn't list jobs, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
+	}
+
 	var list protocol.JobListResponse
 	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
 		return protocol.JobListResponse{}, err
-	}
-	if response.StatusCode != 200 {
-		return protocol.JobListResponse{}, fmt.Errorf("couldn't list jobs, code %v", response.StatusCode)
 	}
 	return list, nil
 }

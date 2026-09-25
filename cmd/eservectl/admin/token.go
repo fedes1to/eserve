@@ -37,12 +37,14 @@ func PostListTokens() ([]protocol.TokenInfo, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		bodyBytes, _ := io.ReadAll(response.Body)
+		return nil, fmt.Errorf("couldn't list tokens, code %v, body:\n%v", response.StatusCode, string(bodyBytes))
+	}
+
 	var list protocol.TokenListResponse
 	if err := json.NewDecoder(response.Body).Decode(&list); err != nil {
 		return nil, err
-	}
-	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("couldn't list tokens, code %v", response.StatusCode)
 	}
 	return list.Tokens, nil
 }
