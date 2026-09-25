@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/hex"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -127,7 +128,7 @@ func serveHTTP(adminEnabled bool) error {
 }
 
 func pkgsHandler(repoBase string) http.Handler {
-	fileServer := http.FileServer(http.Dir(repoBase))
+	fileServer := http.FileServer(binhostFS{root: repoBase})
 	return http.StripPrefix(urls.PkgsSuburl+"/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// strip the leading slash, the toolchain's StripPrefix drops it
 		p := strings.TrimPrefix(r.URL.Path, "/")
@@ -137,4 +138,35 @@ func pkgsHandler(repoBase string) http.Handler {
 		}
 		fileServer.ServeHTTP(w, r)
 	}))
+}
+
+// the binhost root listing must not advertise the mTLS-only binaries/ subtree
+type binhostFS struct {
+	root string
+}
+
+func (fs binhostFS) Open(name string) (http.File, error) {
+	file, err := http.Dir(fs.root).Open(name)
+	if err != nil {
+		return nil, err
+	}
+	if name == "/" {
+		return hiddenDir{file}, nil
+	}
+	return file, nil
+}
+
+type hiddenDir struct {
+	http.File
+}
+
+func (d hiddenDir) Readdir(count int) ([]fs.FileInfo, error) {
+	entries, err := d.File.Readdir(count)
+	kept := entries[:0]
+	for _, entry := range entries {
+		if entry.Name() != "binaries" {
+			kept = append(kept, entry)
+		}
+	}
+	return kept, err
 }
