@@ -83,7 +83,8 @@ func PostIdentity(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, storage.ErrTokenUnknown), errors.Is(err, storage.ErrTokenUsed):
 			status = http.StatusUnauthorized
-		case errors.Is(err, storage.ErrTokenCN), errors.Is(err, storage.ErrTokenFlavor):
+		case errors.Is(err, storage.ErrTokenCN), errors.Is(err, storage.ErrTokenFlavor),
+			errors.Is(err, storage.ErrFlavorExists):
 			status = http.StatusBadRequest
 		case errors.Is(err, storage.ErrMachineTaken):
 			status = http.StatusConflict

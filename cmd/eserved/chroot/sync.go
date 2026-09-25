@@ -57,16 +57,22 @@ func SyncArchivePath(flavor, cn string) string {
 }
 
 func IsProvisioned(flavor string) bool {
+	return IsProvisionedIn(serverConfig.Settings.ChrootBase, flavor)
+}
+
+// the chroot base is a parameter so a caller can look at another root
+func IsProvisionedIn(chrootBase, flavor string) bool {
 	if !ValidFlavor(flavor) {
 		return false
 	}
-	_, err := os.Stat(filepath.Join(chrootDir(flavor), "etc", stageMarker))
+	_, err := os.Stat(filepath.Join(chrootBase, flavor, "etc", stageMarker))
 	return err == nil
 }
 
 // ApplySync applies the archive and runs commit under the same flavor lock, so the
-// stored archive and the recorded fingerprint can never be paired with another sync
-func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath string, commit func(fingerprint string) error) (string, error) {
+// stored archive and the recorded fingerprint can never be paired with another sync.
+// profile is the syncing machine's, and the chroot's make.profile follows it
+func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath, profile string, commit func(fingerprint string) error) (string, error) {
 	if !ValidFlavor(flavor) {
 		return "", fmt.Errorf("invalid flavor %q", flavor)
 	}
@@ -102,6 +108,9 @@ func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath stri
 	}
 
 	if err := installStagedConfig(root, staging, present); err != nil {
+		return "", err
+	}
+	if err := setChrootProfileLocked(flavor, profile); err != nil {
 		return "", err
 	}
 	if commit != nil {

@@ -66,7 +66,13 @@ func Provision(ctx context.Context, job *jobs.Job, request protocol.ProvisionReq
 		}
 	}
 
-	return restoreSyncedConfig(ctx, job, request.Flavor, job.CN)
+	if err := restoreSyncedConfig(ctx, job, request.Flavor, job.CN); err != nil {
+		return err
+	}
+	if err := SetChrootProfile(request.Flavor, request.Profile); err != nil {
+		return fmt.Errorf("couldn't set the chroot profile: %w", err)
+	}
+	return nil
 }
 
 func restoreSyncedConfig(ctx context.Context, job *jobs.Job, flavor, cn string) error {

@@ -191,7 +191,7 @@ func ensureRepo(ctx context.Context, job *jobs.Job, flavor string) error {
 		job.WriteProgress("portage sync failed, falling back to the server's repo")
 	}
 
-	hostRepo := "/var/db/repos/gentoo"
+	hostRepo := hostRepoDir
 	if _, err := os.Stat(hostRepo); err != nil {
 		return fmt.Errorf("the chroot repo sync failed and the server has no %s to copy: %w", hostRepo, err)
 	}

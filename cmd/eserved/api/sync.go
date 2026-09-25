@@ -98,7 +98,8 @@ func PostSync(w http.ResponseWriter, r *http.Request) {
 	}
 	// the apply, the archive rename and the fingerprint record all run under the
 	// flavor lock, so a concurrent sync can't pair one archive with another's fingerprint
-	_, err = chroot.ApplySync(r.Context(), flavor, claimed, temporaryPath, func(fingerprint string) error {
+	profile, _ := storage.MachineProfile(identity.CN)
+	_, err = chroot.ApplySync(r.Context(), flavor, claimed, temporaryPath, profile, func(fingerprint string) error {
 		// only a config that actually applied gets kept; a rejected one stays a temp file
 		if err := os.Rename(temporaryPath, archivePath); err != nil {
 			return fmt.Errorf("couldn't store sync archive: %w", err)

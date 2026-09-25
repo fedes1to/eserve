@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
@@ -53,18 +53,17 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 
 	// the flavor the machine has right now; the job must still find it there
 	expectedFlavor := machineFlavor
-	var switchToken string
-	var spentAt time.Time
-	var previousCN string
+	var switchToken *storage.SwitchToken
 	if machineFlavor != provisionRequest.Flavor {
-		switchToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		// spent here, before the job touches anything, so a token can't be
 		// reused by a concurrent request and a refused switch has no side effect
 		var err error
-		spentAt, previousCN, err = storage.SpendFlavorSwitchToken(switchToken, identity.CN, provisionRequest.Flavor)
+		switchToken, err = storage.SpendFlavorSwitchToken(token, identity.CN, provisionRequest.Flavor)
 		if err != nil {
 			status := http.StatusUnauthorized
-			if errors.Is(err, storage.ErrTokenCN) || errors.Is(err, storage.ErrTokenFlavor) {
+			if errors.Is(err, storage.ErrTokenCN) || errors.Is(err, storage.ErrTokenFlavor) ||
+				errors.Is(err, storage.ErrFlavorExists) {
 				status = http.StatusBadRequest
 			}
 			http.Error(w, err.Error(), status)
@@ -73,14 +72,12 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	}
 
 	job, err := jobs.Registry.Start(identity.CN, provisionRequest.Flavor, "provision", func(ctx context.Context, job *jobs.Job) {
-		ProvisionJob(ctx, job, provisionRequest, expectedFlavor)
+		ProvisionJob(ctx, job, provisionRequest, expectedFlavor, switchToken)
 	})
 	if err != nil {
 		// the job never started, so the switch never happened: hand the token back
-		if switchToken != "" {
-			if refundErr := storage.RefundFlavorSwitchToken(switchToken, spentAt, previousCN); refundErr != nil {
-				log.Printf("%v: racc couldn't refund the switch token: %v\n", ClientIP(r), refundErr)
-			}
+		if refundErr := switchToken.Refund(); refundErr != nil {
+			log.Printf("%v: racc couldn't refund the switch token: %v\n", ClientIP(r), refundErr)
 		}
 		log.Printf("%v: racc failed to start provision job: %v\n", ClientIP(r), err)
 		http.Error(w, "racc couldn't start provision job", http.StatusInternalServerError)
@@ -98,19 +95,39 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, authorizedFlavor string) {
+func ProvisionJob(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, authorizedFlavor string, switchToken *storage.SwitchToken) {
 	job.WriteProgress("starting provision")
 
-	if err := chroot.Provision(ctx, job, request); err != nil {
+	// the switch only counts once ProvisionMachine wrote it, so anything before
+	// that hands the token back; the defer catches a panic too
+	defer func() { _ = switchToken.Refund() }()
+
+	err := provisionChrootAndMachine(ctx, job, request, authorizedFlavor)
+	if err == nil {
+		switchToken.Commit()
+	}
+	if refundErr := switchToken.Refund(); refundErr != nil {
+		job.WriteProgress("warning: couldn't refund the switch token: " + refundErr.Error())
+	}
+	if err != nil {
 		job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
 		return
 	}
 
-	if err := storage.ProvisionMachine(
-		job.CN, request.Subarch, request.GccMachine, request.Profile, request.Flavor, authorizedFlavor); err != nil {
-		job.Finish(jobs.StateError, protocol.StreamEvent{Type: "error", Message: err.Error()})
-		return
+	// machines with different profiles make each other's binpkgs useless
+	if profiles := storage.FlavorProfiles(request.Flavor); len(profiles) > 1 {
+		job.WriteProgress(fmt.Sprintf("warning: flavor %s has machines with different profiles (%s), binpkgs built with one are ignored by the others",
+			request.Flavor, strings.Join(profiles, ", ")))
 	}
 
 	job.Finish(jobs.StateDone, protocol.StreamEvent{Type: "done", Message: "provision complete"})
+}
+
+// the chroot work and the machine record; the flavor switch is only written by the last step
+func provisionChrootAndMachine(ctx context.Context, job *jobs.Job, request protocol.ProvisionRequest, authorizedFlavor string) error {
+	if err := chroot.Provision(ctx, job, request); err != nil {
+		return err
+	}
+	return storage.ProvisionMachine(
+		job.CN, request.Subarch, request.GccMachine, request.Profile, request.Flavor, authorizedFlavor)
 }

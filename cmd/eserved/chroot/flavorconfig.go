@@ -13,12 +13,21 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
 )
 
+// flavors/<name>/profile as a regular file is the chroot profile override, not
+// the portage user profile (that one is a directory)
+func isProfileOverride(entry os.DirEntry) bool {
+	return entry.Name() == "profile" && !entry.IsDir()
+}
+
 func hasFlavorConfig(flavor string) bool {
 	entries, err := os.ReadDir(config.FlavorConfigDir(flavor))
 	if err != nil {
 		return false
 	}
 	for _, entry := range entries {
+		if isProfileOverride(entry) {
+			continue
+		}
 		if syncedPathSet[entry.Name()] {
 			return true
 		}
@@ -36,7 +45,7 @@ func copyFlavorConfig(root *os.Root, staging, flavor string) (present map[string
 
 	present = make(map[string]bool)
 	for _, entry := range entries {
-		if !syncedPathSet[entry.Name()] {
+		if !syncedPathSet[entry.Name()] || isProfileOverride(entry) {
 			continue
 		}
 		full := filepath.Join(base, entry.Name())
@@ -192,7 +201,8 @@ func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string) 
 			return err
 		}
 	}
-	return nil
+	// the flavor's own profile override, if it has one
+	return setChrootProfileLocked(flavor, "")
 }
 
 func ClientSyncArchives(flavor string) []string {

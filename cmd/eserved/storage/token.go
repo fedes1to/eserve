@@ -40,6 +40,7 @@ var (
 	ErrTokenUsed           = errors.New("token already used")
 	ErrTokenCN             = errors.New("token not bound to this cn")
 	ErrTokenFlavor         = errors.New("token not bound to this flavor")
+	ErrFlavorExists        = errors.New("flavor already exists")
 	ErrInvalidTokenBinding = errors.New("invalid token binding")
 )
 

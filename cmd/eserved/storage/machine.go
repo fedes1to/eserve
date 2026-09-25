@@ -182,6 +182,9 @@ func EnrollMachine(token, cn, flavor, fingerprint string) error {
 	if _, machineExists := machines.Entries[cn]; machineExists && tokenEntry.CN != cn {
 		return ErrMachineTaken
 	}
+	if err := flavorJoinRefusalLocked(tokenEntry.Flavor, cn, flavor); err != nil {
+		return err
+	}
 
 	tokenEntry.CN = cn
 	tokenEntry.UsedAt = time.Now()
@@ -198,37 +201,66 @@ func EnrollMachine(token, cn, flavor, fingerprint string) error {
 	return saveMachinesLocked()
 }
 
+// a spent flavor-switch token: refundable until the switch commits, and only once
+type SwitchToken struct {
+	Token      string
+	SpentAt    time.Time
+	PreviousCN string
+	done       bool
+}
+
+// the switch is written, the token stays spent
+func (s *SwitchToken) Commit() {
+	if s != nil {
+		s.done = true
+	}
+}
+
+// hands the token back unless the switch committed; a second call is a no-op
+func (s *SwitchToken) Refund() error {
+	if s == nil || s.done {
+		return nil
+	}
+	s.done = true
+	return RefundFlavorSwitchToken(s.Token, s.SpentAt, s.PreviousCN)
+}
+
 // the flavor-switch policy: the token must be unspent and, if bound, match the
 // machine and the requested flavor; it is consumed in the same lock as the check,
-// so one token can only ever authorize one switch. Returns the stamp it set and the
-// cn it replaced, so a caller whose job never started can undo exactly that
-func SpendFlavorSwitchToken(token, cn, flavor string) (spentAt time.Time, previousCN string, err error) {
+// so one token can only ever authorize one switch. The returned token can be
+// refunded until the switch commits
+func SpendFlavorSwitchToken(token, cn, flavor string) (*SwitchToken, error) {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
+	machinesMutex.Lock()
+	defer machinesMutex.Unlock()
 
 	tokenEntry, exists := tokens.Entries[token]
 	if !exists {
-		return time.Time{}, "", ErrTokenUnknown
+		return nil, ErrTokenUnknown
 	}
 	if !tokenEntry.UsedAt.UTC().IsZero() {
-		return time.Time{}, "", ErrTokenUsed
+		return nil, ErrTokenUsed
 	}
 	if tokenEntry.CN != "" && tokenEntry.CN != cn {
-		return time.Time{}, "", ErrTokenCN
+		return nil, ErrTokenCN
 	}
 	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
-		return time.Time{}, "", ErrTokenFlavor
+		return nil, ErrTokenFlavor
+	}
+	if err := flavorJoinRefusalLocked(tokenEntry.Flavor, cn, flavor); err != nil {
+		return nil, err
 	}
 
-	previousCN = tokenEntry.CN
+	previousCN := tokenEntry.CN
 	tokenEntry.CN = cn
 	tokenEntry.UsedAt = time.Now()
 	tokens.Entries[token] = tokenEntry
 
 	if err := saveTokensLocked(); err != nil {
-		return time.Time{}, "", err
+		return nil, err
 	}
-	return tokenEntry.UsedAt, previousCN, nil
+	return &SwitchToken{Token: token, SpentAt: tokenEntry.UsedAt, PreviousCN: previousCN}, nil
 }
 
 // un-spends a token, but only while it is still exactly as the matching spend left
