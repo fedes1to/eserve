@@ -16,8 +16,7 @@ import (
 
 func PostProvision(w http.ResponseWriter, r *http.Request) {
 	var provisionRequest protocol.ProvisionRequest
-	if err := json.NewDecoder(r.Body).Decode(&provisionRequest); err != nil {
-		http.Error(w, "couldn't decode provisionRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &provisionRequest, "provisionRequest") {
 		return
 	}
 

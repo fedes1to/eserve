@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
@@ -10,8 +9,7 @@ import (
 
 func GetJobStream(w http.ResponseWriter, r *http.Request) {
 	var jobRequest protocol.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
-		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &jobRequest, "jobRequest") {
 		return
 	}
 
@@ -33,8 +31,7 @@ func GetJobStream(w http.ResponseWriter, r *http.Request) {
 
 func PostCancelJob(w http.ResponseWriter, r *http.Request) {
 	var jobRequest protocol.JobRequest
-	if err := json.NewDecoder(r.Body).Decode(&jobRequest); err != nil {
-		http.Error(w, "couldn't decode jobRequest", http.StatusBadRequest)
+	if !decodeJSONBody(w, r, &jobRequest, "jobRequest") {
 		return
 	}
 
