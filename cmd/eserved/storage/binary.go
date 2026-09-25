@@ -28,7 +28,7 @@ func binaryManifestPath(name, arch string) string {
 }
 
 func validateBinaryName(name string) error {
-	if name == "" || len(name) > 64 || strings.ContainsAny(name, "/\\ ") {
+	if name == "" || name == "." || name == ".." || len(name) > 64 || strings.ContainsAny(name, "/\\ ") {
 		return fmt.Errorf("invalid binary name %q: no slashes or spaces", name)
 	}
 	return nil
@@ -36,7 +36,7 @@ func validateBinaryName(name string) error {
 
 func validateArch(arch string) error {
 	// the arch ends up in the path, same treatment
-	if arch == "" || len(arch) > 64 || strings.ContainsAny(arch, "/\\ ") {
+	if arch == "" || arch == "." || arch == ".." || len(arch) > 64 || strings.ContainsAny(arch, "/\\ ") {
 		return fmt.Errorf("invalid arch %q: no slashes or spaces", arch)
 	}
 	return nil
@@ -106,7 +106,12 @@ func GetBinary(name, arch string) (path string, manifest protocol.BinaryManifest
 		return "", manifest, fmt.Errorf("no %s build of %s", arch, name)
 	}
 
-	if err := config.LoadJsonFile(binaryManifestPath(name, arch), &manifest); err != nil {
+	// LoadJsonFile treats a missing file as an empty struct, so check it exists
+	manifestPath := binaryManifestPath(name, arch)
+	if _, err := os.Stat(manifestPath); err != nil {
+		return "", manifest, fmt.Errorf("no manifest for %s/%s", arch, name)
+	}
+	if err := config.LoadJsonFile(manifestPath, &manifest); err != nil {
 		return "", manifest, fmt.Errorf("no manifest for %s/%s", arch, name)
 	}
 	return path, manifest, nil
