@@ -140,7 +140,7 @@ func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
 	}
 
 	pruneSnapshots(binhostDir(flavor))
-	job.WriteProgress(fmt.Sprintf("published %d packages to %s", len(files), baseURL))
+	job.WriteProgress(fmt.Sprintf("published %d binpkgs from the flavor's cache to %s", len(files), baseURL))
 	return nil
 }
 

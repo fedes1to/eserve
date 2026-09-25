@@ -14,6 +14,9 @@ type Profile struct {
 }
 
 func IsGccMachineDiff(clientGccMachine string) bool {
+	if clientGccMachine == "" || serverGccMachine == "" {
+		return false // nothing to compare, not a different arch
+	}
 	clientArch, _, _ := strings.Cut(clientGccMachine, "-")
 	serverArch, _, _ := strings.Cut(serverGccMachine, "-")
 	return clientArch != serverArch

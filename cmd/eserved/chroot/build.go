@@ -18,7 +18,7 @@ import (
 )
 
 // atoms end up on a chroot command line, keep them boring: no flags, no metacharacters
-var atomPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+(-[0-9][A-Za-z0-9.+-]*)?(:[0-9][A-Za-z0-9.+-]*)?$`)
+var atomPattern = regexp.MustCompile(`^[A-Za-z0-9._/][A-Za-z0-9._/-]*(-[0-9][A-Za-z0-9.+-]*)?(:[0-9][A-Za-z0-9.+-]*)?$`)
 
 func validateBuildAtom(atom string) error {
 	if len(atom) == 0 || len(atom) > 128 {

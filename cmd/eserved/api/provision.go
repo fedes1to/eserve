@@ -44,6 +44,10 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if provisionRequest.GccMachine == "" {
+		http.Error(w, "gcc_machine is required", http.StatusBadRequest)
+		return
+	}
 	if chroot.IsGccMachineDiff(provisionRequest.GccMachine) && !chroot.CrossCoversArch(provisionRequest.Flavor, provisionRequest.GccMachine) {
 		http.Error(w, "cross arch not supported for this flavor, choose same arch as eserved", http.StatusBadRequest)
 		return
