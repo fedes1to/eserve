@@ -17,10 +17,6 @@ import (
 
 var mtlsClient *http.Client
 
-func sendMtlsRequest[T any](subUrl string, payload any, into *T, expectedStatus ...int) error {
-	return sendMtlsRequestWithToken(subUrl, payload, "", into, expectedStatus...)
-}
-
 func sendMtlsRequestWithToken[T any](subUrl string, payload any, token string, into *T, expectedStatus ...int) error {
 	body, _ := json.Marshal(payload)
 	request, err := http.NewRequest("POST", clientConfig.Settings.Server+subUrl, bytes.NewReader(body))
