@@ -86,6 +86,11 @@ func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
 		return fmt.Errorf("the build didn't produce any binpkgs")
 	}
 
+	published := make(map[string]bool, len(files))
+	for _, f := range files {
+		published[f.rel] = true
+	}
+
 	now := time.Now().Unix()
 	// two publishes in the same second must not share a dir
 	for fileExists(filepath.Join(binhostDir(flavor), fmt.Sprintf("snapshot-%d", now))) {
@@ -114,7 +119,7 @@ func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
 		}
 	}
 
-	newIndex := rewriteIndexURI(indexData, baseURL)
+	newIndex := rewriteIndexURI(indexData, baseURL, published)
 
 	// the chroot's Packages.gz is stale, both indexes get rewritten
 	if err := os.WriteFile(filepath.Join(snapshot, "Packages"), []byte(newIndex), 0o644); err != nil {
@@ -152,7 +157,7 @@ func readIndexFile(path string) (data string, ok bool) {
 }
 
 // the client joins this URI with each package's PATH to fetch
-func rewriteIndexURI(data, uri string) string {
+func rewriteIndexURI(data, uri string, published map[string]bool) string {
 	lines := strings.Split(data, "\n")
 	headerEnd := len(lines) // the header is everything before the first empty line
 	for i, line := range lines {
@@ -162,15 +167,39 @@ func rewriteIndexURI(data, uri string) string {
 		}
 	}
 
+	// portage trusts the chroot's index (FEATURES=pkgdir-index-trusted), so it can
+	// still list gpkgs cleanAtomCache removed: only index what the snapshot carries
+	var blocks []string
+	for _, block := range strings.Split(strings.Join(lines[headerEnd:], "\n"), "\n\n") {
+		block = strings.Trim(block, "\n")
+		if block == "" {
+			continue
+		}
+		path := ""
+		for _, line := range strings.Split(block, "\n") {
+			if v, ok := strings.CutPrefix(line, "PATH: "); ok {
+				path = v
+				break
+			}
+		}
+		if published[path] {
+			blocks = append(blocks, block)
+		}
+	}
+
 	var rebuilt []string
 	for _, line := range lines[:headerEnd] {
-		if strings.HasPrefix(line, "URI:") {
-			continue // drop any stale URI line, we're adding a fresh one
+		// the stale URI and count are both rewritten below
+		if strings.HasPrefix(line, "URI:") || strings.HasPrefix(line, "PACKAGES:") {
+			continue
 		}
 		rebuilt = append(rebuilt, line)
 	}
-	rebuilt = append(rebuilt, "URI: "+uri)
-	return strings.Join(append(append(rebuilt, lines[headerEnd:]...), ""), "\n")
+	rebuilt = append(rebuilt, "URI: "+uri, fmt.Sprintf("PACKAGES: %d", len(blocks)))
+	for _, block := range blocks {
+		rebuilt = append(rebuilt, "", block)
+	}
+	return strings.Join(rebuilt, "\n") + "\n"
 }
 
 func writeGzipped(path, data string) error {
