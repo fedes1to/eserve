@@ -9,7 +9,7 @@ import (
 
 func SafeSaveJsonFile(path string, from any) error {
 	tmpPath := path + ".tmp"
-	jsonFile, err := os.Create(tmpPath)
+	jsonFile, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,11 @@ func SafeSaveJsonFile(path string, from any) error {
 		return err
 	}
 
-	return os.Rename(tmpPath, path)
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	// the rename carries the tmp file's mode, but an existing file keeps its own
+	return os.Chmod(path, 0o600)
 }
 
 func LoadJsonFile[T any](path string, into *T) error {
