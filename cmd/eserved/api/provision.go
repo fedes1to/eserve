@@ -34,6 +34,11 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid flavor", http.StatusBadRequest)
 		return
 	}
+	// a broken cross.conf would otherwise fall through to the native arch gate
+	if _, err := chroot.CrossTargetError(provisionRequest.Flavor); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	token := ""
 	if machineFlavor != provisionRequest.Flavor {

@@ -18,11 +18,13 @@ import (
 // the target ends up in paths and in the emerge-<target> wrapper name
 var crossTargetPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 
-// cross.conf in the flavor dir names the target triple this flavor cross-builds for
-func CrossTarget(flavor string) (string, bool) {
+// cross.conf in the flavor dir names the target triple this flavor cross-builds for.
+// no cross.conf means "not a cross flavor"; a cross.conf with a bad target is an error,
+// never a silent fallback to a native build
+func CrossTargetError(flavor string) (string, error) {
 	f, err := os.Open(filepath.Join(config.FlavorConfigDir(flavor), "cross.conf"))
 	if err != nil {
-		return "", false
+		return "", nil
 	}
 	defer f.Close()
 	scanner := bufio.NewScanner(f)
@@ -33,10 +35,19 @@ func CrossTarget(flavor string) (string, bool) {
 		}
 		if v, ok := strings.CutPrefix(line, "target="); ok {
 			v = strings.TrimSpace(v)
-			return v, crossTargetPattern.MatchString(v)
+			if !crossTargetPattern.MatchString(v) {
+				return "", fmt.Errorf("invalid cross target %q in flavors/%s/cross.conf", v, flavor)
+			}
+			return v, nil
 		}
 	}
-	return "", false
+	return "", fmt.Errorf("flavors/%s/cross.conf has no target= line", flavor)
+}
+
+// a flavor with a valid cross target
+func CrossTarget(flavor string) (string, bool) {
+	target, err := CrossTargetError(flavor)
+	return target, err == nil && target != ""
 }
 
 // a flavor with a cross target also serves that target's arch, not just the server's

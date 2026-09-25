@@ -297,6 +297,12 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 			return err
 		}
 	}
+	// a broken cross.conf must not quietly turn into a native build
+	crossTarget, crossErr := CrossTargetError(flavor)
+	if crossErr != nil {
+		return crossErr
+	}
+	hasCross := crossTarget != ""
 	if !IsProvisioned(flavor) {
 		return fmt.Errorf("flavor %q is not provisioned", flavor)
 	}
@@ -319,7 +325,6 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		return err
 	}
 
-	crossTarget, hasCross := CrossTarget(flavor)
 	if hasCross {
 		if err := ensureCrossDev(ctx, job, flavor, crossTarget); err != nil {
 			return err
