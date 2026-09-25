@@ -170,8 +170,9 @@ func installStagedConfig(root *os.Root, staging string, present map[string]bool)
 	return linkSyncedPaths(root, present)
 }
 
-// the last archive wins, same as the last sync did
-func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string) error {
+// the last archive wins, same as the last sync did; profile is the last syncing
+// machine's, and the chroot's make.profile follows it
+func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string, profile string) error {
 	if !IsProvisioned(flavor) {
 		return fmt.Errorf("flavor %q is not provisioned", flavor)
 	}
@@ -201,8 +202,8 @@ func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string) 
 			return err
 		}
 	}
-	// the flavor's own profile override, if it has one
-	return setChrootProfileLocked(flavor, "")
+	// the profile of the machine whose config ended up on top
+	return setChrootProfileLocked(flavor, profile)
 }
 
 func ClientSyncArchives(flavor string) []string {

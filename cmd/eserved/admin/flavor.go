@@ -26,6 +26,7 @@ func PostApplyFlavor(w http.ResponseWriter, r *http.Request) {
 	archives := chroot.ClientSyncArchives(request.Flavor)
 
 	// last synced client goes last, its config ends up on top
+	profile := ""
 	if fingerprint, ok := storage.FlavorFingerprintInfo(request.Flavor); ok {
 		archive := chroot.SyncArchivePath(request.Flavor, fingerprint.SyncedBy)
 		var rest []string
@@ -35,9 +36,10 @@ func PostApplyFlavor(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		archives = append(rest, archive)
+		profile, _ = storage.MachineProfile(fingerprint.SyncedBy)
 	}
 
-	if err := chroot.ApplyFlavorToChroot(context.Background(), request.Flavor, archives); err != nil {
+	if err := chroot.ApplyFlavorToChroot(context.Background(), request.Flavor, archives, profile); err != nil {
 		w.Header().Set("Content-Type", "text/plain")
 		http.Error(w, "failed to apply flavor config, check logs: "+err.Error(), http.StatusInternalServerError)
 		return
