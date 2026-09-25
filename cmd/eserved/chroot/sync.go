@@ -189,7 +189,8 @@ func writeMemberFile(root *os.Root, name string, tarReader *tar.Reader, total *i
 	}
 
 	hash := sha256.New()
-	written, err := io.Copy(io.MultiWriter(out, hash), tarReader)
+	// the cap is enforced while copying, a gzip bomb must not fill the disk first
+	written, err := io.Copy(io.MultiWriter(out, hash), io.LimitReader(tarReader, int64(maxExtractedBytes)-*total+1))
 	if err != nil {
 		out.Close()
 		return 0, nil, fmt.Errorf("couldn't write %q: %w", name, err)

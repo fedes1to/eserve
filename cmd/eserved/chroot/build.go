@@ -17,8 +17,9 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/gpg"
 )
 
-// atoms end up on a chroot command line, keep them boring: no flags, no metacharacters
-var atomPattern = regexp.MustCompile(`^[A-Za-z0-9._/][A-Za-z0-9._/-]*(-[0-9][A-Za-z0-9.+-]*)?(:[0-9][A-Za-z0-9.+-]*)?$`)
+// atoms end up on a chroot command line and in a PKGDIR path, keep them boring:
+// no flags, no metacharacters, one slash, no traversal
+var atomPattern = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9._-]*)/([A-Za-z0-9][A-Za-z0-9._-]*?)(-[0-9][A-Za-z0-9.+-]*)?(:[0-9][A-Za-z0-9.+-]*)?$`)
 
 func validateBuildAtom(atom string) error {
 	if len(atom) == 0 || len(atom) > 128 {
@@ -27,10 +28,27 @@ func validateBuildAtom(atom string) error {
 	if strings.ContainsAny(atom, ";&|$` \t\n") {
 		return fmt.Errorf("invalid atom %q: no shell metacharacters", atom)
 	}
+	if strings.Count(atom, "/") != 1 || strings.Contains(atom, "..") {
+		return fmt.Errorf("invalid atom %q: must be cat/pkg", atom)
+	}
 	if !atomPattern.MatchString(atom) {
 		return fmt.Errorf("invalid atom %q: must be cat/pkg[-version][:slot]", atom)
 	}
 	return nil
+}
+
+// the PKGDIR subdir an atom's gpkgs live in, refusing anything outside it
+func atomPkgDir(flavor, atom string) (string, error) {
+	if err := validateBuildAtom(atom); err != nil {
+		return "", err
+	}
+	match := atomPattern.FindStringSubmatch(atom)
+	base := binpkgDir(flavor)
+	dir := filepath.Join(base, match[1], match[2])
+	if !strings.HasPrefix(dir, base+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid atom %q: outside the binpkg dir", atom)
+	}
+	return dir, nil
 }
 
 // resolv/hosts binds are for distfile fetches
@@ -233,23 +251,20 @@ func upsertMakeConfLine(path, variable, value string) error {
 
 func cleanAtomCache(flavor string, atoms []string) {
 	for _, atom := range atoms {
-		parts := strings.SplitN(atom, "/", 3)
-		if len(parts) < 2 {
-			continue
+		dir, err := atomPkgDir(flavor, atom)
+		if err != nil {
+			continue // validated before the build, nothing to clean
 		}
-		name := strings.SplitN(parts[1], "-", 2)[0]
-		os.RemoveAll(filepath.Join(binpkgDir(flavor), parts[0], name))
+		os.RemoveAll(dir)
 	}
 }
 
 func checkBuiltPkgs(flavor string, atoms []string) error {
 	for _, atom := range atoms {
-		parts := strings.SplitN(atom, "/", 3)
-		if len(parts) < 2 {
-			continue
+		dir, err := atomPkgDir(flavor, atom)
+		if err != nil {
+			return err
 		}
-		name := strings.SplitN(parts[1], "-", 2)[0]
-		dir := filepath.Join(binpkgDir(flavor), parts[0], name)
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return fmt.Errorf("no binpkg was produced for %s: %w", atom, err)
@@ -323,17 +338,18 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		parallel = fmt.Sprintf("-j%d", threads)
 	}
 
+	// the atoms go after -- so a stray flag can never be read as an option
+	args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel, "--"}, packages...)
+
 	if hasCross {
 		// the sysroot wrapper emerges into /usr/<target> with the target CHOST and
 		// leaves the gpkgs in the sysroot's PKGDIR
 		job.WriteProgress("cross-building " + strings.Join(packages, ", ") + " for " + crossTarget)
-		args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
 		if err := flavorCommand(ctx, job, flavor, "/usr/bin/emerge-"+crossTarget, args...).Run(); err != nil {
 			return fmt.Errorf("cross emerge failed: %w", err)
 		}
 	} else {
 		job.WriteProgress("building " + strings.Join(packages, ", "))
-		args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
 		if err := flavorEmerge(ctx, job, flavor, args...).Run(); err != nil {
 			return fmt.Errorf("emerge failed: %w", err)
 		}
