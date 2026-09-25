@@ -70,6 +70,7 @@ func serveHTTP(adminEnabled bool) error {
 		{Name: "machines", Function: storage.LoadMachines},
 		{Name: "signing key", Function: gpg.EnsureKey},
 		{Name: "job logs", Function: jobs.SweepStaleLogs},
+		{Name: "chroot mounts", Function: chroot.CleanupStaleMounts},
 	}
 	if err := cli.MustInit(steps); err != nil {
 		return err

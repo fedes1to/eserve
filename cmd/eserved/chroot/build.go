@@ -3,12 +3,16 @@ package chroot
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
@@ -112,15 +116,137 @@ func mountChroot(flavor string) error {
 	return nil
 }
 
-func unmountChroot(flavor string, job *jobs.Job) {
-	dir := chrootDir(flavor)
-	for _, mount := range chrootMounts {
-		target := filepath.Join(dir, mount.chroot)
-		out, err := exec.Command("umount", target).CombinedOutput()
-		if err != nil && !strings.Contains(string(out), "not mounted") {
-			job.WriteProgress("warning: couldn't unmount " + mount.chroot + ": " + string(out))
+// a chroot build leaves daemons rooted inside it: portage's gpkg signing starts
+// gpg-agent (and scdaemon), which setsids itself and outlives the build, so the
+// chroot's binds stay busy until it is gone
+func rootedInChroot(root, dir string) bool {
+	return root == dir || strings.HasPrefix(root, dir+string(filepath.Separator))
+}
+
+func chrootProcesses(dir string) []int {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil
+	}
+	var pids []int
+	for _, entry := range entries {
+		pid, err := strconv.Atoi(entry.Name())
+		if err != nil {
+			continue
+		}
+		if root, err := os.Readlink(filepath.Join("/proc", entry.Name(), "root")); err == nil && rootedInChroot(root, dir) {
+			pids = append(pids, pid)
 		}
 	}
+	return pids
+}
+
+// SIGTERM, a moment to go on their own, then SIGKILL; returns how many were left
+func killChrootProcesses(dir string) int {
+	pids := chrootProcesses(dir)
+	if len(pids) == 0 {
+		return 0
+	}
+	for _, pid := range pids {
+		syscall.Kill(pid, syscall.SIGTERM)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && len(chrootProcesses(dir)) > 0 {
+		time.Sleep(50 * time.Millisecond)
+	}
+	for _, pid := range chrootProcesses(dir) {
+		// the pid could have been reused since the scan, so look again
+		if root, err := os.Readlink(filepath.Join("/proc", strconv.Itoa(pid), "root")); err != nil || !rootedInChroot(root, dir) {
+			continue
+		}
+		syscall.Kill(pid, syscall.SIGKILL)
+	}
+	return len(pids)
+}
+
+func unmountPath(target string) error {
+	out, err := exec.Command("umount", target).CombinedOutput()
+	if err != nil && !strings.Contains(string(out), "not mounted") {
+		return fmt.Errorf("%v: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// the chroot's binds have to come off before the flavor can be deleted, so a
+// mount that is still busy is an error, not a warning
+func unmountChroot(flavor string) error {
+	dir := chrootDir(flavor)
+	var busy []string
+	for _, mount := range chrootMounts {
+		if err := unmountPath(filepath.Join(dir, mount.chroot)); err != nil {
+			busy = append(busy, mount.chroot+" ("+err.Error()+")")
+		}
+	}
+	if len(busy) > 0 {
+		return fmt.Errorf("couldn't unmount the %s chroot: %s", flavor, strings.Join(busy, ", "))
+	}
+	return nil
+}
+
+// kill whatever the build left rooted in the chroot, then unmount; a mount that
+// survives both passes is a real error
+func releaseChroot(flavor string, job *jobs.Job) error {
+	dir := chrootDir(flavor)
+	if n := killChrootProcesses(dir); n > 0 {
+		job.WriteProgress(fmt.Sprintf("killed %d process(es) left running inside the chroot", n))
+	}
+	if err := unmountChroot(flavor); err != nil {
+		// something grabbed a mount again, one more pass
+		killChrootProcesses(dir)
+		if retryErr := unmountChroot(flavor); retryErr != nil {
+			return retryErr
+		}
+	}
+	return nil
+}
+
+// a crash or a restart mid-build leaves the chroot's binds mounted and the
+// daemons that held them alive; clean both up before anything else runs
+func CleanupStaleMounts() error {
+	base := serverConfig.Settings.ChrootBase
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || !ValidFlavor(entry.Name()) {
+			continue
+		}
+		dir := filepath.Join(base, entry.Name())
+		if len(activeChrootMounts(dir)) == 0 {
+			continue
+		}
+		if n := killChrootProcesses(dir); n > 0 {
+			log.Printf("chroot cleanup: killed %d process(es) left inside %s", n, dir)
+		}
+		var stuck []string
+		for range 2 {
+			stuck = stuck[:0]
+			for _, mount := range activeChrootMounts(dir) {
+				if err := unmountPath(mount); err != nil {
+					stuck = append(stuck, mount)
+					continue
+				}
+				log.Printf("chroot cleanup: unmounted %s", mount)
+			}
+			if len(stuck) == 0 {
+				break
+			}
+			killChrootProcesses(dir)
+		}
+		if len(stuck) > 0 {
+			log.Printf("chroot cleanup: still mounted under %s: %s", dir, strings.Join(stuck, ", "))
+		}
+	}
+	return nil
 }
 
 const repoRefresh = 7 * 24 * time.Hour
@@ -165,6 +291,17 @@ func flavorCommand(ctx context.Context, job *jobs.Job, flavor, exe string, args 
 	} else {
 		full := append([]string{chrootDir(flavor)}, inner...)
 		command = exec.CommandContext(ctx, "chroot", full...)
+		// its own session, so a cancel reaches emerge's whole tree and not just chroot
+		command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+		command.Cancel = func() error {
+			if command.Process == nil {
+				return nil
+			}
+			if err := syscall.Kill(-command.Process.Pid, syscall.SIGKILL); err != nil {
+				return command.Process.Kill()
+			}
+			return nil
+		}
 	}
 	command.Stdout = &jobs.JobWriter{Job: job}
 	command.Stderr = &jobs.JobWriter{Job: job}
@@ -287,7 +424,7 @@ func checkBuiltPkgs(flavor string, atoms []string) error {
 }
 
 // a client sync can swap the portage config mid-build, so take the flavor lock too
-func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []string) error {
+func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []string) (err error) {
 	if !ValidFlavor(flavor) {
 		return fmt.Errorf("invalid flavor %q", flavor)
 	}
@@ -329,7 +466,12 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		if err := mountChroot(flavor); err != nil {
 			return err
 		}
-		defer unmountChroot(flavor, job)
+		defer func() {
+			if cleanupErr := releaseChroot(flavor, job); cleanupErr != nil {
+				job.WriteProgress("error: " + cleanupErr.Error())
+				err = errors.Join(err, cleanupErr)
+			}
+		}()
 	}
 	if err := ensureRepo(ctx, job, flavor); err != nil {
 		return err
