@@ -2,7 +2,9 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
@@ -10,6 +12,30 @@ import (
 
 type flavorApplyRequest struct {
 	Flavor string `json:"flavor"`
+}
+
+func PostDeleteFlavor(w http.ResponseWriter, r *http.Request) {
+	var request flavorApplyRequest
+	if !decodeJSONBody(w, r, &request, "flavorDeleteRequest") {
+		return
+	}
+	if !chroot.ValidFlavor(request.Flavor) {
+		http.Error(w, "invalid flavor", http.StatusBadRequest)
+		return
+	}
+	// a machine on the flavor would be left pointing at a chroot that no longer exists
+	if machines := storage.MachinesOnFlavor(request.Flavor); len(machines) > 0 {
+		http.Error(w, fmt.Sprintf("flavor %s still has machines on it (%s), delete or move them first",
+			request.Flavor, strings.Join(machines, ", ")), http.StatusConflict)
+		return
+	}
+	if err := chroot.DeleteFlavor(request.Flavor); err != nil {
+		http.Error(w, "failed to delete flavor: "+err.Error(), http.StatusConflict)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte("ok"))
 }
 
 func PostApplyFlavor(w http.ResponseWriter, r *http.Request) {

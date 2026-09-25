@@ -88,6 +88,7 @@ func serveHTTP(adminEnabled bool) error {
 		adminMux.HandleFunc(urls.AdminJobsCancelSuburl, admin.PostAdminCancelJob)
 		adminMux.HandleFunc(urls.AdminJobsStreamSuburl, admin.PostAdminJobStream)
 		adminMux.HandleFunc(urls.FlavorApplySuburl, admin.PostApplyFlavor)
+		adminMux.HandleFunc(urls.FlavorDeleteSuburl, admin.PostDeleteFlavor)
 		adminMux.HandleFunc(urls.BinaryUploadSuburl, admin.PostUploadBinary)
 		adminMux.HandleFunc(urls.BinaryListSuburl, admin.PostListBinaries)
 

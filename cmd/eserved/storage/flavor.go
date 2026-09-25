@@ -93,6 +93,21 @@ func flavorJoinRefusalLocked(tokenFlavor, cn, flavor string) error {
 	return fmt.Errorf("%w: flavor %s already exists, use a token bound to it (eservectl token create -flavor %s)", ErrFlavorExists, flavor, flavor)
 }
 
+// the machines on a flavor, sorted
+func MachinesOnFlavor(flavor string) []string {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	cns := make([]string, 0, len(machines.Entries))
+	for cn, entry := range machines.Entries {
+		if entry.Flavor == flavor {
+			cns = append(cns, cn)
+		}
+	}
+	slices.Sort(cns)
+	return cns
+}
+
 // the distinct profiles of the machines on a flavor, sorted
 func FlavorProfiles(flavor string) []string {
 	machinesMutex.RLock()

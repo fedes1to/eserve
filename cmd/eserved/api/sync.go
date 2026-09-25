@@ -54,6 +54,12 @@ func PostSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "machine has no flavor, run provision first", http.StatusBadRequest)
 		return
 	}
+	// identity enrolls before the provision job runs, so a machine whose provision
+	// failed must not push config into a flavor it never provisioned
+	if !storage.MachineProvisioned(identity.CN) {
+		http.Error(w, "machine has not provisioned yet, run provision first", http.StatusConflict)
+		return
+	}
 
 	claimed := r.Header.Get("X-Portage-Fingerprint")
 	if claimed == "" {

@@ -72,6 +72,7 @@ func printBuildUsage() {
 func printFlavorUsage() {
 	cli.PrintUsage("eservectl flavor", []cli.Command{
 		{Name: "apply", Description: "Applies the flavor's config to its chroots (-flavor)"},
+		{Name: "delete", Description: "Deletes a flavor: chroot, binhost, sync and config (-flavor)"},
 		{Name: "config", Description: "Shows the flavor's config files (-flavor)"},
 		{Name: "config create", Description: "Scaffolds a flavor's config files (-flavor)"},
 	})
@@ -384,7 +385,7 @@ func parseBuildFlags() (error, int) {
 
 func parseFlavorFlags() (error, int) {
 	if len(os.Args) < 3 || strings.Contains(os.Args[2], "help") ||
-		(os.Args[2] != "apply" && os.Args[2] != "config") {
+		(os.Args[2] != "apply" && os.Args[2] != "delete" && os.Args[2] != "config") {
 		printFlavorUsage()
 	}
 
@@ -418,6 +419,20 @@ func parseFlavorFlags() (error, int) {
 			return err, 1
 		}
 		fmt.Println("flavor config applied")
+	case "delete":
+		fs := flag.NewFlagSet("flavor delete", flag.ExitOnError)
+		flavor := fs.String("flavor", "", "flavor to delete")
+		fs.Parse(args)
+		if *flavor == "" {
+			return fmt.Errorf("-flavor flag is required"), 2
+		}
+		if err := admin.TryConnect(); err != nil {
+			return fmt.Errorf("Can't connect, %w", err), 1
+		}
+		if err := admin.PostDeleteFlavor(*flavor); err != nil {
+			return err, 1
+		}
+		fmt.Println("flavor deleted")
 	case "config":
 		fs := flag.NewFlagSet("flavor config", flag.ExitOnError)
 		flavor := fs.String("flavor", "", "flavor to show the config of")

@@ -50,15 +50,20 @@ func CrossTarget(flavor string) (string, bool) {
 	return target, err == nil && target != ""
 }
 
-// a flavor with a cross target also serves that target's arch, not just the server's
-func CrossCoversArch(flavor, clientGccMachine string) bool {
-	target, ok := CrossTarget(flavor)
-	if !ok || clientGccMachine == "" {
-		return false
+// why a client can't provision into this flavor, "" when it can. a cross flavor
+// serves exactly its target's CHOST (a client with a different triple can't
+// install the binpkgs it builds), a native one serves the server's arch
+func ArchRefusal(flavor, clientGccMachine string) string {
+	if target, ok := CrossTarget(flavor); ok {
+		if clientGccMachine != "" && target != clientGccMachine {
+			return fmt.Sprintf("flavor %s cross-builds for %s, this machine is %s", flavor, target, clientGccMachine)
+		}
+		return ""
 	}
-	clientArch, _, _ := strings.Cut(clientGccMachine, "-")
-	targetArch, _, _ := strings.Cut(target, "-")
-	return clientArch == targetArch
+	if IsGccMachineDiff(clientGccMachine) {
+		return fmt.Sprintf("cross arch %s not supported for flavor %s, choose a flavor for %s or the same arch as eserved", clientGccMachine, flavor, clientGccMachine)
+	}
+	return ""
 }
 
 // the cross dev sdk marker, same convention as the repo marker
@@ -122,8 +127,23 @@ func setupCrossSysroot(flavor, target string) error {
 	portageDir := filepath.Join(crossSysrootDir(flavor, target), "etc/portage")
 	// crossdev writes this when it first sets the sysroot up, a wiped one would break the build
 	profile := filepath.Join(portageDir, "make.profile")
-	if _, err := os.Lstat(profile); err != nil {
-		if err := os.Symlink("/var/db/repos/gentoo/profiles/embedded", profile); err != nil {
+	// the sysroot's profile: the flavor's override wins (a cross target usually wants
+	// its own arch profile, e.g. default/linux/amd64/23.0/musl, or the binpkgs come
+	// out with the host's ABI flags), otherwise crossdev's embedded one
+	sysrootProfile := "/var/db/repos/gentoo/profiles/embedded"
+	if override, hasOverride, err := flavorProfileOverride(flavor); err != nil {
+		return err
+	} else if hasOverride {
+		if info, err := os.Stat(filepath.Join(chrootDir(flavor), gentooProfilesDir, override)); err != nil || !info.IsDir() {
+			return fmt.Errorf("profile %q is not in the chroot's %s", override, gentooProfilesDir)
+		}
+		sysrootProfile = "/var/db/repos/gentoo/profiles/" + override
+	}
+	if current, err := os.Readlink(profile); err != nil || current != sysrootProfile {
+		if err := os.Remove(profile); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("couldn't replace the sysroot profile: %w", err)
+		}
+		if err := os.Symlink(sysrootProfile, profile); err != nil {
 			return fmt.Errorf("couldn't set the sysroot profile: %w", err)
 		}
 	}

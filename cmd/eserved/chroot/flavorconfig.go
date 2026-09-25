@@ -1,6 +1,7 @@
 package chroot
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
 	"git.fedesito.me/fedes1to/eserve/internal/config"
 	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
@@ -219,6 +221,71 @@ func applyFlavorToChrootLocked(ctx context.Context, flavor string, archives []st
 func hasFlavorMakeConf(flavor string) bool {
 	info, err := os.Stat(filepath.Join(config.FlavorConfigDir(flavor), "make.conf"))
 	return err == nil && info.Mode().IsRegular()
+}
+
+// a crashed build can leave bind mounts behind, and removing the tree under them
+// would be a mess
+func activeChrootMounts(chrootDir string) []string {
+	file, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+
+	var mounts []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		// mountinfo: the mountpoint is field 5, before the " - "
+		parts := strings.SplitN(scanner.Text(), " - ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		fields := strings.Fields(parts[0])
+		if len(fields) >= 5 && strings.HasPrefix(fields[4], chrootDir+string(filepath.Separator)) {
+			mounts = append(mounts, fields[4])
+		}
+	}
+	return mounts
+}
+
+// a flavor goes away entirely: its chroot, its binhost, its sync archives and its
+// config dir. refuses while a job is queued or running for it
+func DeleteFlavor(flavor string) error {
+	if !ValidFlavor(flavor) {
+		return fmt.Errorf("invalid flavor %q", flavor)
+	}
+	busy := func() error {
+		if jobs.Registry.FlavorBusy(flavor) {
+			return fmt.Errorf("flavor %s has a job queued or running, cancel it first", flavor)
+		}
+		return nil
+	}
+	// before the lock: a running job holds it, and waiting for the job to finish is
+	// not what "delete this flavor" should do
+	if err := busy(); err != nil {
+		return err
+	}
+	unlock := flavorlock.Lock(flavor)
+	defer unlock()
+	// and again now that nothing can be running
+	if err := busy(); err != nil {
+		return err
+	}
+	if mounts := activeChrootMounts(chrootDir(flavor)); len(mounts) > 0 {
+		return fmt.Errorf("flavor %s still has mounts under its chroot (%s), unmount them first", flavor, strings.Join(mounts, ", "))
+	}
+
+	for _, path := range []string{
+		chrootDir(flavor),
+		filepath.Join(serverConfig.Settings.RepoBase, flavor),
+		filepath.Join(serverConfig.ServerConfigPath, "sync", flavor),
+		config.FlavorConfigDir(flavor),
+	} {
+		if err := os.RemoveAll(path); err != nil {
+			return fmt.Errorf("couldn't remove %s: %w", path, err)
+		}
+	}
+	return nil
 }
 
 // the flavor's make.conf carries the signing config, so the chroot's make.conf

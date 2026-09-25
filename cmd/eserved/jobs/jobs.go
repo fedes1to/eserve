@@ -449,6 +449,19 @@ func (r *JobRegistry) List() []protocol.JobInfo {
 	return list
 }
 
+// a flavor with a queued or running job must not be deleted under it
+func (r *JobRegistry) FlavorBusy(flavor string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for _, job := range r.jobs {
+		if job.Flavor == flavor && !job.IsFinished() {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *JobRegistry) cleanup() {
 	r.mu.Lock()
 	defer r.mu.Unlock()

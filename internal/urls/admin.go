@@ -15,5 +15,6 @@ const (
 	BinaryUploadSuburl    = "/admin/v1/binary/upload"
 	BinaryListSuburl      = "/admin/v1/binary/list"
 	FlavorApplySuburl     = "/admin/v1/flavor/apply"
+	FlavorDeleteSuburl    = "/admin/v1/flavor/delete"
 	AdminJobsStreamSuburl = "/admin/v1/jobs/stream"
 )

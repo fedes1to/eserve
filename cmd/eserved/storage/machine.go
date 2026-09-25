@@ -106,10 +106,15 @@ func DeleteMachine(cn string) error {
 
 	unlock := flavorlock.Lock(entry.Flavor)
 	defer unlock()
+
+	// the archive goes either way, or a later flavor apply re-applies the config of
+	// a machine that no longer exists
+	if err := os.Remove(chroot.SyncArchivePath(entry.Flavor, cn)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 	if fingerprint, ok := FlavorFingerprintInfo(entry.Flavor); ok && fingerprint.SyncedBy == cn {
 		return SetFlavorFingerprint(entry.Flavor, "", "")
 	}
-	os.Remove(chroot.SyncArchivePath(entry.Flavor, cn))
 	return nil
 }
 
@@ -127,8 +132,8 @@ func ProvisionMachine(cn, subarch, gccMachine, profile, flavor, expectedFlavor s
 		return fmt.Errorf("machine %v is on flavor %v now, this provision was queued for %v", cn, upsertedEntry.Flavor, expectedFlavor)
 	}
 
-	if chroot.IsGccMachineDiff(gccMachine) && !chroot.CrossCoversArch(flavor, gccMachine) {
-		return fmt.Errorf("cross arch %v not supported for flavor %v, choose same arch as eserved", gccMachine, flavor)
+	if refusal := chroot.ArchRefusal(flavor, gccMachine); refusal != "" {
+		return errors.New(refusal)
 	}
 
 	entry := MachineEntry{
@@ -156,6 +161,17 @@ func MachineExists(cn string) bool {
 
 	_, exists := machines.Entries[cn]
 	return exists
+}
+
+// identity enrolls a machine before the provision job runs, so an entry with no
+// gcc machine is one whose provision never completed (the handler rejects an
+// empty gcc_machine, so a completed provision always has one)
+func MachineProvisioned(cn string) bool {
+	machinesMutex.RLock()
+	defer machinesMutex.RUnlock()
+
+	entry, exists := machines.Entries[cn]
+	return exists && entry.Profile.GccMachine != ""
 }
 
 // consumes the token and registers the machine under one lock, so two identities

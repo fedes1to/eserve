@@ -28,11 +28,13 @@ func validateBuildAtom(atom string) error {
 	if strings.ContainsAny(atom, ";&|$` \t\n") {
 		return fmt.Errorf("invalid atom %q: no shell metacharacters", atom)
 	}
-	if strings.Count(atom, "/") != 1 || strings.Contains(atom, "..") {
+	// portage's versioned atom syntax: =cat/pkg-version
+	body := strings.TrimPrefix(atom, "=")
+	if strings.Count(body, "/") != 1 || strings.Contains(body, "..") {
 		return fmt.Errorf("invalid atom %q: must be cat/pkg", atom)
 	}
-	if !atomPattern.MatchString(atom) {
-		return fmt.Errorf("invalid atom %q: must be cat/pkg[-version][:slot]", atom)
+	if !atomPattern.MatchString(body) {
+		return fmt.Errorf("invalid atom %q: must be [=]cat/pkg[-version][:slot]", atom)
 	}
 	return nil
 }
@@ -42,7 +44,7 @@ func atomPkgDir(flavor, atom string) (string, error) {
 	if err := validateBuildAtom(atom); err != nil {
 		return "", err
 	}
-	match := atomPattern.FindStringSubmatch(atom)
+	match := atomPattern.FindStringSubmatch(strings.TrimPrefix(atom, "="))
 	base := binpkgDir(flavor)
 	dir := filepath.Join(base, match[1], match[2])
 	if !strings.HasPrefix(dir, base+string(filepath.Separator)) {
@@ -355,8 +357,11 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		parallel = fmt.Sprintf("-j%d", threads)
 	}
 
-	// the atoms go after -- so a stray flag can never be read as an option
-	args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel, "--"}, packages...)
+	// the atoms go after -- so a stray flag can never be read as an option; --update
+	// so a plain cat/pkg builds the newest visible version (what clients upgrade to)
+	// instead of rebuilding whatever the chroot happens to have installed, and
+	// --selective=n so an already-current package is still rebuilt into a binpkg
+	args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", "--update", "--selective=n", parallel, "--"}, packages...)
 
 	if hasCross {
 		// the sysroot wrapper emerges into /usr/<target> with the target CHOST and
