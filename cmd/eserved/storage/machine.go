@@ -20,6 +20,9 @@ import (
 // a lookup by name found nothing; the admin handlers answer 404 for it
 var ErrNotFound = errors.New("not found")
 
+// an unbound token may enroll a new machine, never take over a registered one
+var ErrMachineTaken = errors.New("machine already registered, use a token bound to this cn")
+
 type MachineEntry struct {
 	Subarch     string         `json:"march"`
 	Profile     chroot.Profile `json:"profile"`
@@ -149,9 +152,6 @@ func MachineExists(cn string) bool {
 	_, exists := machines.Entries[cn]
 	return exists
 }
-
-// an unbound token may enroll a new machine, never take over a registered one
-var ErrMachineTaken = errors.New("machine already registered, use a token bound to this cn")
 
 // consumes the token and registers the machine under one lock, so two identities
 // racing for the same cn can't both win
