@@ -96,15 +96,16 @@ func PostSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "couldn't close sync archive", http.StatusInternalServerError)
 		return
 	}
-	if err := os.Rename(temporaryPath, archivePath); err != nil {
-		http.Error(w, "couldn't store sync archive", http.StatusInternalServerError)
-		return
-	}
-
-	fingerprint, err := chroot.ApplySync(r.Context(), flavor, claimed, archivePath)
+	fingerprint, err := chroot.ApplySync(r.Context(), flavor, claimed, temporaryPath)
 	if err != nil {
 		log.Printf("%v: racc failed to apply sync for flavor %v: %v\n", ClientIP(r), flavor, err)
 		http.Error(w, "racc couldn't apply sync to chroot", http.StatusInternalServerError)
+		return
+	}
+
+	// only a config that actually applied gets kept; a rejected one stays a temp file
+	if err := os.Rename(temporaryPath, archivePath); err != nil {
+		http.Error(w, "couldn't store sync archive", http.StatusInternalServerError)
 		return
 	}
 
