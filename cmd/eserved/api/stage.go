@@ -2,8 +2,8 @@ package api
 
 import (
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 
 	"git.fedesito.me/fedes1to/eserve/internal/sharedStorage"
 )
@@ -12,7 +12,7 @@ func GetStages(w http.ResponseWriter, r *http.Request) {
 	stageList, err := sharedStorage.GetStageList()
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to get stages,", err)
+		log.Println("failed to get stages,", err)
 		http.Error(w, "failed to get stages, check logs", http.StatusInternalServerError)
 		return
 	}

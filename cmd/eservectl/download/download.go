@@ -26,20 +26,21 @@ func humanBytes(n int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(n)/float64(div), "KMGTPE"[exp])
 }
 
-func PrintDownloadPercent(done chan int64, path string, total int64) {
+func printDownloadPercent(done chan int64, path string, total int64) {
 	file, err := os.Open(path)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
+		return
 	}
 	defer file.Close()
 
 	prevSize, prevTime, speed := int64(0), time.Now(), 0.0
 
 	// renders one line in place via \r; called every tick and once more on done
-	render := func() {
+	render := func() error {
 		fi, err := file.Stat()
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		size, now := fi.Size(), time.Now()
@@ -66,16 +67,22 @@ func PrintDownloadPercent(done chan int64, path string, total int64) {
 
 		fmt.Printf("\r%s  %s / %s  %.1f MiB/s  ETA %s",
 			percent, humanBytes(size), humanBytes(total), speed/(1024*1024), eta)
+		return nil
 	}
 
 	for {
 		select {
 		case <-done:
-			render()
+			if err := render(); err != nil {
+				log.Println(err)
+			}
 			fmt.Println()
 			return
 		default:
-			render()
+			if err := render(); err != nil {
+				log.Println(err)
+				return
+			}
 		}
 		time.Sleep(time.Second)
 	}
@@ -100,8 +107,8 @@ func DownloadFile(url string, dest string) (string, error) {
 		resp.Body.Close()
 	}
 
-	done := make(chan int64)
-	go PrintDownloadPercent(done, fullPath, total)
+	done := make(chan int64, 1)
+	go printDownloadPercent(done, fullPath, total)
 
 	resp, err := http.Get(url)
 	if err != nil {

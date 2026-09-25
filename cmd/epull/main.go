@@ -88,15 +88,19 @@ func parseSelfUpdate() (error, int) {
 	return api.HandleSelfUpdate()
 }
 
+func printUsage() {
+	cli.PrintUsage("epull", []cli.Command{
+		{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
+		{Name: "provision", Description: "Provisions your machine on the target server"},
+		{Name: "sync", Description: "Sync your portage config with the server flavor"},
+		{Name: "selfupdate", Description: "Replace this epull binary with the server-hosted build"},
+	})
+	os.Exit(2)
+}
+
 func main() {
 	if len(os.Args) < 2 {
-		cli.PrintUsage("epull", []cli.Command{
-			{Name: "register", Description: "Set up a flavor (chroot) on the target server"},
-			{Name: "provision", Description: "Provisions your machine on the target server"},
-			{Name: "sync", Description: "Sync your portage config with the server flavor"},
-			{Name: "selfupdate", Description: "Replace this epull binary with the server-hosted build"},
-		})
-		os.Exit(2)
+		printUsage()
 	}
 
 	switch os.Args[1] {
@@ -124,5 +128,7 @@ func main() {
 			fmt.Fprintln(os.Stderr, "\x1b[31mSelfupdate went wrong,\x1b[0m", err)
 		}
 		os.Exit(exitCode)
+	default:
+		printUsage()
 	}
 }

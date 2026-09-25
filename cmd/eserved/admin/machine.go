@@ -3,8 +3,8 @@ package admin
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"os"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/storage"
 	"git.fedesito.me/fedes1to/eserve/internal/protocol"
@@ -19,7 +19,7 @@ func PostRevokeMachine(w http.ResponseWriter, r *http.Request) {
 	err := storage.RevokeMachine(revokeRequest.CN)
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to revoke machine,", err)
+		log.Println("failed to revoke machine,", err)
 		http.Error(w, "failed to revoke machine, check logs", http.StatusInternalServerError)
 		return
 	}
@@ -42,7 +42,7 @@ func PostDeleteMachine(w http.ResponseWriter, r *http.Request) {
 	err := storage.DeleteMachine(deleteRequest.CN)
 
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "failed to delete machine,", err)
+		log.Println("failed to delete machine,", err)
 		http.Error(w, "failed to delete machine, check logs", http.StatusInternalServerError)
 		return
 	}

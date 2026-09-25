@@ -94,7 +94,7 @@ func parseTokenFlags() (error, int) {
 
 	err := admin.TryConnect()
 	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 0
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	switch os.Args[2] {
@@ -189,7 +189,7 @@ func parseMachineFlags() (error, int) {
 
 	err := admin.TryConnect()
 	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 0
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	switch os.Args[2] {
@@ -245,7 +245,7 @@ func parseJobFlags() (error, int) {
 
 	err := admin.TryConnect()
 	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 0
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	switch os.Args[2] {
@@ -311,7 +311,7 @@ func parseBuildFlags() (error, int) {
 
 	err := admin.TryConnect()
 	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 0
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	fs := flag.NewFlagSet("build start", flag.ExitOnError)
@@ -365,7 +365,7 @@ func parseFlavorFlags() (error, int) {
 	case "apply":
 		err := admin.TryConnect()
 		if err != nil {
-			return fmt.Errorf("Can't connect, %w", err), 0
+			return fmt.Errorf("Can't connect, %w", err), 1
 		}
 		fs := flag.NewFlagSet("flavor apply", flag.ExitOnError)
 		flavor := fs.String("flavor", "", "flavor to apply the config to")
@@ -426,7 +426,7 @@ func parseBinaryFlags() (error, int) {
 
 	err := admin.TryConnect()
 	if err != nil {
-		return fmt.Errorf("Can't connect, %w", err), 0
+		return fmt.Errorf("Can't connect, %w", err), 1
 	}
 
 	switch os.Args[2] {
