@@ -15,12 +15,21 @@ import (
 	"git.fedesito.me/fedes1to/eserve/internal/urls"
 )
 
-// done and cancelled are clean stops, error is a failure
+// done and cancelled are clean stops, error is a failure; the job's error has to
+// come back out, or a failed provision looks like a success to the caller
 func readJobStream(body io.Reader) error {
-	return protocol.EachSSEEvent(body, func(event protocol.StreamEvent) bool {
+	var jobErr error
+	streamErr := protocol.EachSSEEvent(body, func(event protocol.StreamEvent) bool {
 		terminal, err := handleStreamEvent(event.Type, event.Message)
+		if err != nil {
+			jobErr = err
+		}
 		return err != nil || terminal
 	})
+	if jobErr != nil {
+		return jobErr
+	}
+	return streamErr
 }
 
 func handleStreamEvent(eventType, message string) (bool, error) {
@@ -97,7 +106,7 @@ func getStreamJob(jobID string) (err error) {
 	go watchInterrupts(jobID, done)
 
 	if err := readJobStream(response.Body); err != nil {
-		return fmt.Errorf("lost the stream for job %s: %w", jobID, err)
+		return fmt.Errorf("job %s: %w", jobID, err)
 	}
 	return nil
 }

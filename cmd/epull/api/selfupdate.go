@@ -81,6 +81,6 @@ func HandleSelfUpdate() (error, int) {
 		return err, 1
 	}
 
-	fmt.Printf("replaced %v with %s build (sha256 %s, %d bytes)\n", executable, arch, actualSum, manifest.Size)
+	fmt.Printf("replaced %v with %s build (sha256 %s, %d bytes)\n", executable, manifest.Arch, actualSum, manifest.Size)
 	return nil, 0
 }

@@ -92,6 +92,28 @@ func UploadBinary(manifest protocol.BinaryManifest, file io.Reader) error {
 	return config.SafeSaveJsonFile(binaryManifestPath(manifest.Name, manifest.Arch), manifest)
 }
 
+// a client whose exact CHOST was never uploaded still gets a same-arch build: epull
+// is built static, so the vendor and libc fields of the triple don't matter
+func sameArchBinary(name, arch string) (string, bool) {
+	archField, _, _ := strings.Cut(arch, "-")
+	entries, err := os.ReadDir(binaryDir())
+	if err != nil {
+		return "", false
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || entry.Name() == arch {
+			continue
+		}
+		if candidate, _, _ := strings.Cut(entry.Name(), "-"); candidate != archField {
+			continue
+		}
+		if info, err := os.Stat(binaryPath(name, entry.Name())); err == nil && info.Size() > 0 {
+			return entry.Name(), true
+		}
+	}
+	return "", false
+}
+
 func GetBinary(name, arch string) (path string, manifest protocol.BinaryManifest, err error) {
 	if err := validateBinaryName(name); err != nil {
 		return "", manifest, err
@@ -103,7 +125,12 @@ func GetBinary(name, arch string) (path string, manifest protocol.BinaryManifest
 	path = binaryPath(name, arch)
 	info, err := os.Stat(path)
 	if err != nil || info.Size() == 0 {
-		return "", manifest, fmt.Errorf("no %s build of %s", arch, name)
+		fallback, ok := sameArchBinary(name, arch)
+		if !ok {
+			return "", manifest, fmt.Errorf("no %s build of %s", arch, name)
+		}
+		arch = fallback
+		path = binaryPath(name, arch)
 	}
 
 	// LoadJsonFile treats a missing file as an empty struct, so check it exists
