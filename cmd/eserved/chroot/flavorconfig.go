@@ -178,7 +178,11 @@ func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string, 
 	}
 	unlock := flavorlock.Lock(flavor)
 	defer unlock()
+	return applyFlavorToChrootLocked(ctx, flavor, archives, profile)
+}
 
+// READ THE FUCKING NAME, USE ONLY WHEN LOCKED
+func applyFlavorToChrootLocked(ctx context.Context, flavor string, archives []string, profile string) error {
 	root, err := os.OpenRoot(chrootDir(flavor))
 	if err != nil {
 		return fmt.Errorf("couldn't open chroot: %w", err)
@@ -186,6 +190,12 @@ func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string, 
 	defer root.Close()
 
 	sweepStaleConfigDirs(root, chrootDir(flavor))
+
+	// a flavor nobody has synced yet still needs its own layer installed, so an
+	// empty archive list means "the flavor layer alone"
+	if len(archives) == 0 && hasFlavorConfig(flavor) {
+		archives = []string{""}
+	}
 
 	for _, archive := range archives {
 		suffix, err := randomSuffix()
@@ -204,6 +214,21 @@ func ApplyFlavorToChroot(ctx context.Context, flavor string, archives []string, 
 	}
 	// the profile of the machine whose config ended up on top
 	return setChrootProfileLocked(flavor, profile)
+}
+
+func hasFlavorMakeConf(flavor string) bool {
+	info, err := os.Stat(filepath.Join(config.FlavorConfigDir(flavor), "make.conf"))
+	return err == nil && info.Mode().IsRegular()
+}
+
+// the flavor's make.conf carries the signing config, so the chroot's make.conf
+// being our link into .eserved/ is what "the flavor layer landed" means
+func flavorLayerApplied(flavor string) bool {
+	if !hasFlavorMakeConf(flavor) {
+		return true // nothing to apply
+	}
+	target, err := os.Readlink(filepath.Join(chrootDir(flavor), "etc/portage/make.conf"))
+	return err == nil && target == "../../"+ConfigDir+"/make.conf"
 }
 
 func ClientSyncArchives(flavor string) []string {

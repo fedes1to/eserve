@@ -310,6 +310,18 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 	unlock := flavorlock.Lock(flavor)
 	defer unlock()
 
+	// a fresh flavor whose layer never landed would build unsigned gpkgs, so make
+	// sure it is in the chroot before anything reads the portage config
+	if !flavorLayerApplied(flavor) {
+		job.WriteProgress("applying the flavor config")
+		if err := applyFlavorToChrootLocked(ctx, flavor, ClientSyncArchives(flavor), ""); err != nil {
+			return err
+		}
+	}
+	if !hasFlavorMakeConf(flavor) {
+		job.WriteProgress("warning: flavor " + flavor + " has no make.conf, the gpkgs will be unsigned")
+	}
+
 	job.WriteProgress("preparing the chroot")
 	if !useBwrap() {
 		if err := mountChroot(flavor); err != nil {
