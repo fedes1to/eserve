@@ -17,7 +17,6 @@ import (
 )
 
 type MachineEntry struct {
-	Arch        string         `json:"arch"`
 	Subarch     string         `json:"march"`
 	Profile     chroot.Profile `json:"profile"`
 	Flavor      string         `json:"flavor"`
@@ -146,13 +145,6 @@ func MachineExists(cn string) bool {
 
 	_, exists := machines.Entries[cn]
 	return exists
-}
-
-func IsMachineCrossdev(cn string) bool {
-	machinesMutex.RLock()
-	defer machinesMutex.RUnlock()
-
-	return machines.Entries[cn].Profile.IsCrossdev()
 }
 
 func UpsertMachine(cn, fingerprint, flavor string) error {

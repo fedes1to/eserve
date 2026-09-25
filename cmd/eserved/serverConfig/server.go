@@ -11,8 +11,7 @@ import (
 
 type ServerSettings struct {
 	ListenAddr     string `json:"listen_addr"`
-	BuildThreads   int    `json:"build_threads"`    // 0 = unlimited
-	PerUserThreads int    `json:"per_user_threads"` // 0 = unlimited
+	BuildThreads   int    `json:"build_threads"` // 0 = unlimited
 	ChrootBase     string `json:"chroot_base"`
 	StagePath      string `json:"stage_path"`
 	TlsCertPath    string `json:"tls_cert_path"`

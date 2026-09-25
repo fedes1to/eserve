@@ -22,10 +22,6 @@ Name-Email: eserved@localhost
 Expire-Date: 0
 `
 
-func Home() string {
-	return home
-}
-
 func EnsureKey() error {
 	if _, err := KeyFingerprint(); err == nil {
 		return nil

@@ -238,7 +238,7 @@ func cleanAtomCache(flavor string, atoms []string) {
 			continue
 		}
 		name := strings.SplitN(parts[1], "-", 2)[0]
-		os.RemoveAll(filepath.Join(chrootDir(flavor), "var/cache/binpkgs", parts[0], name))
+		os.RemoveAll(filepath.Join(binpkgDir(flavor), parts[0], name))
 	}
 }
 
@@ -249,7 +249,7 @@ func checkBuiltPkgs(flavor string, atoms []string) error {
 			continue
 		}
 		name := strings.SplitN(parts[1], "-", 2)[0]
-		dir := filepath.Join(chrootDir(flavor), "var/cache/binpkgs", parts[0], name)
+		dir := filepath.Join(binpkgDir(flavor), parts[0], name)
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			return fmt.Errorf("no binpkg was produced for %s: %w", atom, err)
@@ -309,7 +309,7 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 		if err := ensureCrossDev(ctx, job, flavor, crossTarget); err != nil {
 			return err
 		}
-		if err := SyncCrossOverlay(flavor, crossTarget); err != nil {
+		if err := setupCrossSysroot(flavor, crossTarget); err != nil {
 			return err
 		}
 	}
@@ -324,15 +324,12 @@ func BuildJob(ctx context.Context, job *jobs.Job, flavor string, packages []stri
 	}
 
 	if hasCross {
+		// the sysroot wrapper emerges into /usr/<target> with the target CHOST and
+		// leaves the gpkgs in the sysroot's PKGDIR
 		job.WriteProgress("cross-building " + strings.Join(packages, ", ") + " for " + crossTarget)
-		for _, atom := range packages {
-			catPn := crossAtom(atom)
-			if !crossEbuildPresent(flavor, crossTarget, catPn) {
-				return fmt.Errorf("no cross ebuild for %s yet: drop one into flavors/%s/crossdev/cross-%s/%s and run flavor apply (crossdev only auto-generates the toolchain stages)", catPn, flavor, crossTarget, catPn)
-			}
-			if err := flavorCommand(ctx, job, flavor, "/usr/bin/crossdev", "-t", crossTarget, "-oO", "/usr/portage/local/crossdev", "--ex-only", "--ex-pkg", catPn, "--portage", "-v").Run(); err != nil {
-				return fmt.Errorf("cross build of %s failed: %w", atom, err)
-			}
+		args := append([]string{"--buildpkg", "--usepkg=n", "--getbinpkg=n", parallel}, packages...)
+		if err := flavorCommand(ctx, job, flavor, "/usr/bin/emerge-"+crossTarget, args...).Run(); err != nil {
+			return fmt.Errorf("cross emerge failed: %w", err)
 		}
 	} else {
 		job.WriteProgress("building " + strings.Join(packages, ", "))

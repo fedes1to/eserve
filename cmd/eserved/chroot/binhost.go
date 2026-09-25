@@ -37,7 +37,7 @@ func PublishBinpkgs(job *jobs.Job, flavor string) (err error) {
 	if !ValidFlavor(flavor) {
 		return fmt.Errorf("invalid flavor %q", flavor)
 	}
-	pkgDir := filepath.Join(chrootDir(flavor), "var/cache/binpkgs")
+	pkgDir := binpkgDir(flavor)
 	if _, err := os.Stat(pkgDir); err != nil {
 		return fmt.Errorf("no binpkg dir in the chroot, did the build produce any: %w", err)
 	}
