@@ -8,14 +8,15 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
-	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
-	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"git.fedesito.me/fedes1to/eserve/cmd/eserved/serverConfig"
+	"git.fedesito.me/fedes1to/eserve/internal/flavorlock"
+	"git.fedesito.me/fedes1to/eserve/internal/protocol"
 )
 
 const ConfigDir = ".eserved"

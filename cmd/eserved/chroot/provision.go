@@ -51,7 +51,7 @@ func Provision(ctx context.Context, job *jobs.Job, request protocol.ProvisionReq
 		job.WriteProgress("chroot already exists, skipping extraction")
 	} else {
 		dir := chrootDir(request.Flavor)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("couldn't create chroot dir: %w", err)
 		}
 

@@ -13,10 +13,6 @@ type Profile struct {
 	GccMachine string
 }
 
-func (profile Profile) IsCrossdev() bool {
-	return IsGccMachineDiff(profile.GccMachine)
-}
-
 func IsGccMachineDiff(clientGccMachine string) bool {
 	clientArch, _, _ := strings.Cut(clientGccMachine, "-")
 	serverArch, _, _ := strings.Cut(serverGccMachine, "-")
