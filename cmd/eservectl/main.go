@@ -165,6 +165,9 @@ func parseStageFlags() (error, int) {
 		fs := flag.NewFlagSet("stage install", flag.ExitOnError)
 		path := fs.String("path", "", "local path for the stagefile to install")
 		fs.Parse(os.Args[3:])
+		if *path == "" {
+			return fmt.Errorf("-path flag is required"), 2
+		}
 		if err := storage.InstallStage(*path); err != nil {
 			return err, 1
 		}
