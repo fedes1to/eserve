@@ -18,7 +18,7 @@ BINPKG_GPG_SIGNING_GPG_HOME="/etc/eserved-gnupg"
 BINPKG_GPG_SIGNING_DIGEST="SHA256"
 BINPKG_GPG_VERIFY_BASE_COMMAND="gpg --status-fd 2 --verify [PORTAGE_CONFIG] [SIGNATURE]"
 BINPKG_GPG_VERIFY_GPG_HOME="/etc/eserved-gnupg"
-// portage drops verify to user "nobody" by default, which cant read the root-only keyring
+# portage drops verify to user "nobody" by default, which cant read the root-only keyring
 GPG_VERIFY_USER_DROP=""
 `
 
