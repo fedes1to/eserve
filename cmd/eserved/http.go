@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/admin"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/api"
@@ -31,6 +32,13 @@ func requireClientCert(next http.Handler) http.Handler {
 		}
 		peerCertificate := r.TLS.PeerCertificates[0]
 		cn := peerCertificate.Subject.CommonName
+
+		// tls.RequestClientCert means go never checks the validity window for us
+		if time.Now().After(peerCertificate.NotAfter) {
+			log.Printf("%v Attempted request with an expired certificate\n", api.ClientIP(r))
+			http.Error(w, "expired client certificate", http.StatusUnauthorized)
+			return
+		}
 
 		fingerprint := sha256.Sum256(peerCertificate.Raw)
 		fingerprintHex := hex.EncodeToString(fingerprint[:])
