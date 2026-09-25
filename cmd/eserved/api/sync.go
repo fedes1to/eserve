@@ -96,22 +96,21 @@ func PostSync(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "couldn't close sync archive", http.StatusInternalServerError)
 		return
 	}
-	fingerprint, err := chroot.ApplySync(r.Context(), flavor, claimed, temporaryPath)
+	// the apply, the archive rename and the fingerprint record all run under the
+	// flavor lock, so a concurrent sync can't pair one archive with another's fingerprint
+	_, err = chroot.ApplySync(r.Context(), flavor, claimed, temporaryPath, func(fingerprint string) error {
+		// only a config that actually applied gets kept; a rejected one stays a temp file
+		if err := os.Rename(temporaryPath, archivePath); err != nil {
+			return fmt.Errorf("couldn't store sync archive: %w", err)
+		}
+		if err := storage.SetFlavorFingerprint(flavor, fingerprint, identity.CN); err != nil {
+			return fmt.Errorf("couldn't record portage fingerprint: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		log.Printf("%v: racc failed to apply sync for flavor %v: %v\n", ClientIP(r), flavor, err)
 		http.Error(w, "racc couldn't apply sync to chroot", http.StatusInternalServerError)
-		return
-	}
-
-	// only a config that actually applied gets kept; a rejected one stays a temp file
-	if err := os.Rename(temporaryPath, archivePath); err != nil {
-		http.Error(w, "couldn't store sync archive", http.StatusInternalServerError)
-		return
-	}
-
-	if err := storage.SetFlavorFingerprint(flavor, fingerprint, identity.CN); err != nil {
-		log.Printf("%v: racc failed to record fingerprint for flavor %v: %v\n", ClientIP(r), flavor, err)
-		http.Error(w, "couldn't record portage fingerprint", http.StatusInternalServerError)
 		return
 	}
 

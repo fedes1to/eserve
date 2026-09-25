@@ -21,7 +21,13 @@ import (
 
 const ConfigDir = ".eserved"
 
-const maxExtractedBytes = 256 << 20
+const (
+	maxExtractedBytes = 256 << 20
+	// a real /etc/portage is a few hundred files; 300k one-byte members cost
+	// ~1.2 GB in inodes and blocks, so cap the count and the path bytes too
+	maxExtractedMembers   = 4096
+	maxExtractedPathBytes = 1 << 20
+)
 
 var syncedPathSet = func() map[string]bool {
 	set := make(map[string]bool, len(protocol.PortageSyncPaths))
@@ -54,7 +60,9 @@ func IsProvisioned(flavor string) bool {
 	return err == nil
 }
 
-func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath string) (string, error) {
+// ApplySync applies the archive and runs commit under the same flavor lock, so the
+// stored archive and the recorded fingerprint can never be paired with another sync
+func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath string, commit func(fingerprint string) error) (string, error) {
 	if !ValidFlavor(flavor) {
 		return "", fmt.Errorf("invalid flavor %q", flavor)
 	}
@@ -92,6 +100,11 @@ func ApplySync(ctx context.Context, flavor, claimedFingerprint, archivePath stri
 	if err := installStagedConfig(root, staging, present); err != nil {
 		return "", err
 	}
+	if commit != nil {
+		if err := commit(fingerprint); err != nil {
+			return "", err
+		}
+	}
 	return fingerprint, nil
 }
 
@@ -112,6 +125,7 @@ func extractArchive(ctx context.Context, archivePath string, root *os.Root, stag
 	manifest := protocol.NewPortageManifest()
 	present = make(map[string]bool)
 	var extracted int64
+	var members, pathBytes int
 
 	for {
 		header, err := tarReader.Next()
@@ -138,6 +152,15 @@ func extractArchive(ctx context.Context, archivePath string, root *os.Root, stag
 			continue
 		}
 		present[top] = true
+
+		members++
+		pathBytes += len(name)
+		if members > maxExtractedMembers {
+			return nil, "", fmt.Errorf("sync archive has more than %d entries", maxExtractedMembers)
+		}
+		if pathBytes > maxExtractedPathBytes {
+			return nil, "", fmt.Errorf("sync archive paths exceed %d bytes", maxExtractedPathBytes)
+		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
