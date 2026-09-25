@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
@@ -102,16 +103,19 @@ func isTokenAvailableLocked(token string) bool {
 	return true
 }
 
+// the cn ends up in file names and logs, so keep it boring: no dots at the
+// edges, no control characters, no unicode
+var cnPattern = regexp.MustCompile(`^[A-Za-z0-9]([A-Za-z0-9._-]*[A-Za-z0-9_-])?$`)
+
 func ValidCN(token string, cn string) bool {
 	tokensMutex.RLock()
 	defer tokensMutex.RUnlock()
 
 	entry, exists := tokens.Entries[token]
-	if !exists || cn == "" {
+	if !exists {
 		return false
 	}
-	// the cn ends up in file names and logs: same boring rules as flavors
-	if cn == "." || cn == ".." || strings.ContainsAny(cn, "/\\ ") {
+	if len(cn) == 0 || len(cn) > 64 || !cnPattern.MatchString(cn) {
 		return false
 	}
 
