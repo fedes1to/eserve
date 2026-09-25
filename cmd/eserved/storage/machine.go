@@ -113,19 +113,18 @@ func DeleteMachine(cn string) error {
 	return nil
 }
 
-// the flavor written must be the one the request authorized, so a job can't
-// write a flavor no token paid for
-func ProvisionMachine(cn, subarch, gccMachine, profile, flavor, authorizedFlavor string) error {
-	if flavor != authorizedFlavor {
-		return fmt.Errorf("flavor %v was not authorized for this provision", flavor)
-	}
-
+// the flavor the machine had when the request was made: a job queued before a
+// concurrent switch must not run afterwards and silently revert the machine
+func ProvisionMachine(cn, subarch, gccMachine, profile, flavor, expectedFlavor string) error {
 	machinesMutex.Lock()
 	defer machinesMutex.Unlock()
 
 	upsertedEntry, exists := machines.Entries[cn]
 	if !exists || upsertedEntry.Fingerprint == "" {
 		return fmt.Errorf("machine %v has no certificate — run identity first", cn)
+	}
+	if upsertedEntry.Flavor != expectedFlavor {
+		return fmt.Errorf("machine %v is on flavor %v now, this provision was queued for %v", cn, upsertedEntry.Flavor, expectedFlavor)
 	}
 
 	if chroot.IsGccMachineDiff(gccMachine) && !chroot.CrossCoversArch(flavor, gccMachine) {
@@ -200,9 +199,40 @@ func EnrollMachine(token, cn, flavor, fingerprint string) error {
 }
 
 // the flavor-switch policy: the token must be unspent and, if bound, match the
-// machine and the requested flavor; it is consumed in the same lock as the
-// check, so one token can only ever authorize one switch
-func SpendFlavorSwitchToken(token, cn, flavor string) error {
+// machine and the requested flavor; it is consumed in the same lock as the check,
+// so one token can only ever authorize one switch. Returns the stamp it set, so a
+// caller whose job never started can hand it back to RefundFlavorSwitchToken
+func SpendFlavorSwitchToken(token, cn, flavor string) (time.Time, error) {
+	tokensMutex.Lock()
+	defer tokensMutex.Unlock()
+
+	tokenEntry, exists := tokens.Entries[token]
+	if !exists {
+		return time.Time{}, ErrTokenUnknown
+	}
+	if !tokenEntry.UsedAt.UTC().IsZero() {
+		return time.Time{}, ErrTokenUsed
+	}
+	if tokenEntry.CN != "" && tokenEntry.CN != cn {
+		return time.Time{}, ErrTokenCN
+	}
+	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
+		return time.Time{}, ErrTokenFlavor
+	}
+
+	tokenEntry.CN = cn
+	tokenEntry.UsedAt = time.Now()
+	tokens.Entries[token] = tokenEntry
+
+	if err := saveTokensLocked(); err != nil {
+		return time.Time{}, err
+	}
+	return tokenEntry.UsedAt, nil
+}
+
+// un-spends a token, but only while it is still exactly as the matching spend
+// left it, so a refund can never revive a token another request used
+func RefundFlavorSwitchToken(token, cn string, spentAt time.Time) error {
 	tokensMutex.Lock()
 	defer tokensMutex.Unlock()
 
@@ -210,18 +240,12 @@ func SpendFlavorSwitchToken(token, cn, flavor string) error {
 	if !exists {
 		return ErrTokenUnknown
 	}
-	if !tokenEntry.UsedAt.UTC().IsZero() {
+	if tokenEntry.CN != cn || !tokenEntry.UsedAt.Equal(spentAt) {
 		return ErrTokenUsed
 	}
-	if tokenEntry.CN != "" && tokenEntry.CN != cn {
-		return ErrTokenCN
-	}
-	if tokenEntry.Flavor != "" && tokenEntry.Flavor != flavor {
-		return ErrTokenFlavor
-	}
 
-	tokenEntry.CN = cn
-	tokenEntry.UsedAt = time.Now()
+	tokenEntry.CN = ""
+	tokenEntry.UsedAt = time.Time{}
 	tokens.Entries[token] = tokenEntry
 
 	return saveTokensLocked()

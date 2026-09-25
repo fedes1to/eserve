@@ -27,6 +27,10 @@ const (
 	// ~1.2 GB in inodes and blocks, so cap the count and the path bytes too
 	maxExtractedMembers   = 4096
 	maxExtractedPathBytes = 1 << 20
+	// MkdirAll creates every intermediate component, so one deep path amplifies
+	// into thousands of directories; a real path is 1-3 components deep
+	maxMemberComponents = 16
+	maxDerivedDirs      = 8192
 )
 
 var syncedPathSet = func() map[string]bool {
@@ -125,7 +129,7 @@ func extractArchive(ctx context.Context, archivePath string, root *os.Root, stag
 	manifest := protocol.NewPortageManifest()
 	present = make(map[string]bool)
 	var extracted int64
-	var members, pathBytes int
+	var members, pathBytes, derivedDirs int
 
 	for {
 		header, err := tarReader.Next()
@@ -160,6 +164,14 @@ func extractArchive(ctx context.Context, archivePath string, root *os.Root, stag
 		}
 		if pathBytes > maxExtractedPathBytes {
 			return nil, "", fmt.Errorf("sync archive paths exceed %d bytes", maxExtractedPathBytes)
+		}
+		components := strings.Count(name, "/") + 1
+		if components > maxMemberComponents {
+			return nil, "", fmt.Errorf("sync archive member %q has more than %d path components", name, maxMemberComponents)
+		}
+		derivedDirs += components - 1
+		if derivedDirs > maxDerivedDirs {
+			return nil, "", fmt.Errorf("sync archive would create more than %d directories", maxDerivedDirs)
 		}
 
 		switch header.Typeflag {

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/chroot"
 	"git.fedesito.me/fedes1to/eserve/cmd/eserved/jobs"
@@ -41,7 +42,6 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authorizedFlavor := machineFlavor
 	if provisionRequest.GccMachine == "" {
 		http.Error(w, "gcc_machine is required", http.StatusBadRequest)
 		return
@@ -51,11 +51,17 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// the flavor the machine has right now; the job must still find it there
+	expectedFlavor := machineFlavor
+	var switchToken string
+	var spentAt time.Time
 	if machineFlavor != provisionRequest.Flavor {
-		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		switchToken = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		// spent here, before the job touches anything, so a token can't be
 		// reused by a concurrent request and a refused switch has no side effect
-		if err := storage.SpendFlavorSwitchToken(token, identity.CN, provisionRequest.Flavor); err != nil {
+		var err error
+		spentAt, err = storage.SpendFlavorSwitchToken(switchToken, identity.CN, provisionRequest.Flavor)
+		if err != nil {
 			status := http.StatusUnauthorized
 			if errors.Is(err, storage.ErrTokenCN) || errors.Is(err, storage.ErrTokenFlavor) {
 				status = http.StatusBadRequest
@@ -63,13 +69,18 @@ func PostProvision(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), status)
 			return
 		}
-		authorizedFlavor = provisionRequest.Flavor
 	}
 
 	job, err := jobs.Registry.Start(identity.CN, provisionRequest.Flavor, "provision", func(ctx context.Context, job *jobs.Job) {
-		ProvisionJob(ctx, job, provisionRequest, authorizedFlavor)
+		ProvisionJob(ctx, job, provisionRequest, expectedFlavor)
 	})
 	if err != nil {
+		// the job never started, so the switch never happened: hand the token back
+		if switchToken != "" {
+			if refundErr := storage.RefundFlavorSwitchToken(switchToken, identity.CN, spentAt); refundErr != nil {
+				log.Printf("%v: racc couldn't refund the switch token: %v\n", ClientIP(r), refundErr)
+			}
+		}
 		log.Printf("%v: racc failed to start provision job: %v\n", ClientIP(r), err)
 		http.Error(w, "racc couldn't start provision job", http.StatusInternalServerError)
 		return

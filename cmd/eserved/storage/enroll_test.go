@@ -4,6 +4,7 @@ import (
 	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // the enrollment policy: an unbound token enrolls a new machine only, a bound
@@ -124,11 +125,11 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SpendFlavorSwitchToken(cnBound, "advS3", "advt"); !errors.Is(err, ErrTokenCN) {
+	if _, err := SpendFlavorSwitchToken(cnBound, "advS3", "advt"); !errors.Is(err, ErrTokenCN) {
 		t.Errorf("cn-bound token switching another machine: %v", err)
 	}
 	// and the refusal didn't spend it
-	if err := SpendFlavorSwitchToken(cnBound, "advS2", "advt"); err != nil {
+	if _, err := SpendFlavorSwitchToken(cnBound, "advS2", "advt"); err != nil {
 		t.Fatalf("cn-bound token switching its own machine: %v", err)
 	}
 
@@ -137,20 +138,20 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SpendFlavorSwitchToken(flavorBound, "advS", "advt"); !errors.Is(err, ErrTokenFlavor) {
+	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "advt"); !errors.Is(err, ErrTokenFlavor) {
 		t.Errorf("flavor-bound token switching another flavor: %v", err)
 	}
-	if err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); err != nil {
+	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); err != nil {
 		t.Fatalf("flavor-bound token switching its own flavor: %v", err)
 	}
 
 	// a spent token can't be spent again
-	if err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); !errors.Is(err, ErrTokenUsed) {
+	if _, err := SpendFlavorSwitchToken(flavorBound, "advS", "gnome"); !errors.Is(err, ErrTokenUsed) {
 		t.Errorf("double spend: %v", err)
 	}
 
 	// an unknown token is refused
-	if err := SpendFlavorSwitchToken("nope", "advS", "gnome"); !errors.Is(err, ErrTokenUnknown) {
+	if _, err := SpendFlavorSwitchToken("nope", "advS", "gnome"); !errors.Is(err, ErrTokenUnknown) {
 		t.Errorf("unknown token: %v", err)
 	}
 
@@ -159,14 +160,29 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := SpendFlavorSwitchToken(unbound, "advS", "advt"); err != nil {
+	if _, err := SpendFlavorSwitchToken(unbound, "advS", "advt"); err != nil {
 		t.Fatalf("unbound token switching: %v", err)
 	}
-	if err := SpendFlavorSwitchToken(unbound, "advS3", "advt"); !errors.Is(err, ErrTokenUsed) {
+	if _, err := SpendFlavorSwitchToken(unbound, "advS3", "advt"); !errors.Is(err, ErrTokenUsed) {
 		t.Errorf("unbound token spent twice: %v", err)
 	}
+}
 
-	// ProvisionMachine refuses to write a flavor the request didn't authorize
+// a token is only refunded while it is still exactly as the spend left it, and a
+// provision queued before a switch must not run afterwards and revert the flavor
+func TestFlavorSwitchRefundAndStaleJob(t *testing.T) {
+	dir := t.TempDir()
+	tokensPath = filepath.Join(dir, "tokens.json")
+	machinesPath = filepath.Join(dir, "machines.json")
+	tokens = TokensFile{}
+	machines = MachinesFile{}
+	if err := LoadTokens(); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadMachines(); err != nil {
+		t.Fatal(err)
+	}
+
 	enroll, err := CreateToken("", "")
 	if err != nil {
 		t.Fatal(err)
@@ -174,10 +190,55 @@ func TestSpendFlavorSwitchTokenPolicy(t *testing.T) {
 	if err := EnrollMachine(enroll, "advS", "gnome", "fp"); err != nil {
 		t.Fatal(err)
 	}
-	if err := ProvisionMachine("advS", "amd64", "x86_64-pc-linux-gnu", "default/linux/amd64/23.0", "advt", "gnome"); err == nil {
-		t.Error("ProvisionMachine wrote a flavor the request didn't authorize")
+
+	// the job never started, so the token comes back and can be spent again
+	token, err := CreateToken("advS", "advt")
+	if err != nil {
+		t.Fatal(err)
 	}
-	if flavor, _ := MachineFlavor("advS"); flavor != "gnome" {
-		t.Errorf("the refused provision changed the flavor to %v", flavor)
+	spentAt, err := SpendFlavorSwitchToken(token, "advS", "advt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RefundFlavorSwitchToken(token, "advS", spentAt); err != nil {
+		t.Fatalf("refunding a token whose job never started: %v", err)
+	}
+	if _, err := SpendFlavorSwitchToken(token, "advS", "advt"); err != nil {
+		t.Fatalf("spending a refunded token: %v", err)
+	}
+
+	// a refund can't revive a token another request spent
+	other, err := CreateToken("advS", "advt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherAt, err := SpendFlavorSwitchToken(other, "advS", "advt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := RefundFlavorSwitchToken(other, "advS", otherAt.Add(time.Second)); !errors.Is(err, ErrTokenUsed) {
+		t.Errorf("refunding with a stale stamp: %v", err)
+	}
+	if err := RefundFlavorSwitchToken(other, "someone-else", otherAt); !errors.Is(err, ErrTokenUsed) {
+		t.Errorf("refunding another machine's spend: %v", err)
+	}
+
+	// a provision queued while the machine was on gnome must not run after a
+	// switch to advt and revert it
+	if err := ProvisionMachine("advS", "amd64", "x86_64-pc-linux-gnu", "default/linux/amd64/23.0", "advt", "gnome"); err != nil {
+		t.Fatalf("switching to advt: %v", err)
+	}
+	if flavor, _ := MachineFlavor("advS"); flavor != "advt" {
+		t.Fatalf("the switch didn't take, flavor is %v", flavor)
+	}
+	if err := ProvisionMachine("advS", "amd64", "x86_64-pc-linux-gnu", "default/linux/amd64/23.0", "gnome", "gnome"); err == nil {
+		t.Error("a stale job reverted the machine to gnome")
+	}
+	if flavor, _ := MachineFlavor("advS"); flavor != "advt" {
+		t.Errorf("the refused stale job changed the flavor to %v", flavor)
+	}
+	// a job that still finds its flavor there goes through
+	if err := ProvisionMachine("advS", "amd64", "x86_64-pc-linux-gnu", "default/linux/amd64/23.0", "advt", "advt"); err != nil {
+		t.Errorf("a current job was refused: %v", err)
 	}
 }
